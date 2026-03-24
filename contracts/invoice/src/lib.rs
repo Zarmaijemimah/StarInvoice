@@ -13,7 +13,18 @@ pub struct InvoiceContract;
 #[contractimpl]
 impl InvoiceContract {
     /// Creates a new invoice and stores it on-chain.
-    /// Returns the generated invoice ID.
+    ///
+    /// # Parameters
+    /// - `freelancer`: Address of the service provider; must sign the transaction.
+    /// - `client`: Address of the paying party.
+    /// - `amount`: Payment amount in the smallest token unit (stroops).
+    /// - `description`: Human-readable description of the work.
+    ///
+    /// # Returns
+    /// The newly assigned invoice ID.
+    ///
+    /// # Errors
+    /// Panics if `freelancer` authorization fails.
     pub fn create_invoice(
         env: Env,
         freelancer: Address,
@@ -40,46 +51,61 @@ impl InvoiceContract {
         invoice_id
     }
 
-    /// Allows the client to fund the invoice escrow.
-    /// TODO: Implement escrow funding logic
-    /// - Verify caller is the invoice client
-    /// - Transfer `amount` tokens from client to contract
-    /// - Update invoice status to Funded
-    /// - Emit fund_invoice event
-    /// See: https://github.com/your-org/StarInvoice/issues/1
+    /// Allows the client to deposit funds into escrow for the given invoice.
+    ///
+    /// # Parameters
+    /// - `invoice_id`: ID of the invoice to fund.
+    ///
+    /// # Errors
+    /// - Panics if the caller is not the invoice client.
+    /// - Panics if the invoice status is not `Pending`.
+    ///
+    /// # TODO
+    /// Not yet implemented. See: <https://github.com/your-org/StarInvoice/issues/1>
     pub fn fund_invoice(_env: Env, _invoice_id: u64) {
         todo!("fund_invoice not yet implemented")
     }
 
-    /// Allows the freelancer to mark work as delivered.
-    /// TODO: Implement delivery marking logic
-    /// - Verify caller is the invoice freelancer
-    /// - Verify invoice status is Funded
-    /// - Update invoice status to Delivered
-    /// - Emit mark_delivered event
-    /// See: https://github.com/your-org/StarInvoice/issues/2
+    /// Allows the freelancer to signal that work has been completed.
+    ///
+    /// # Parameters
+    /// - `invoice_id`: ID of the invoice to mark as delivered.
+    ///
+    /// # Errors
+    /// - Panics if the caller is not the invoice freelancer.
+    /// - Panics if the invoice status is not `Funded`.
+    ///
+    /// # TODO
+    /// Not yet implemented. See: <https://github.com/your-org/StarInvoice/issues/2>
     pub fn mark_delivered(_env: Env, _invoice_id: u64) {
         todo!("mark_delivered not yet implemented")
     }
 
-    /// Allows the client to approve the delivered work.
-    /// TODO: Implement approval logic
-    /// - Verify caller is the invoice client
-    /// - Verify invoice status is Delivered
-    /// - Update invoice status to Approved
-    /// - Emit approve_payment event
-    /// See: https://github.com/your-org/StarInvoice/issues/3
+    /// Allows the client to approve the delivered work, authorising fund release.
+    ///
+    /// # Parameters
+    /// - `invoice_id`: ID of the invoice to approve.
+    ///
+    /// # Errors
+    /// - Panics if the caller is not the invoice client.
+    /// - Panics if the invoice status is not `Delivered`.
+    ///
+    /// # TODO
+    /// Not yet implemented. See: <https://github.com/your-org/StarInvoice/issues/3>
     pub fn approve_payment(_env: Env, _invoice_id: u64) {
         todo!("approve_payment not yet implemented")
     }
 
-    /// Releases escrowed funds to the freelancer after approval.
-    /// TODO: Implement payment release logic
-    /// - Verify invoice status is Approved
-    /// - Transfer escrowed tokens to freelancer
-    /// - Update invoice status to Completed
-    /// - Emit release_payment event
-    /// See: https://github.com/your-org/StarInvoice/issues/4
+    /// Releases escrowed funds to the freelancer once the invoice is approved.
+    ///
+    /// # Parameters
+    /// - `invoice_id`: ID of the invoice to settle.
+    ///
+    /// # Errors
+    /// - Panics if the invoice status is not `Approved`.
+    ///
+    /// # TODO
+    /// Not yet implemented. See: <https://github.com/your-org/StarInvoice/issues/4>
     pub fn release_payment(_env: Env, _invoice_id: u64) {
         todo!("release_payment not yet implemented")
     }
