@@ -17,6 +17,17 @@ pub fn invoice_created(
     );
 }
 
+/// Emits an event when an invoice is cancelled.
+///
+/// Topic: `("INVOICE", "cancelled")`
+/// Data:  `(invoice_id, cancelled_by)`
+pub fn invoice_cancelled(env: &Env, invoice_id: u64, cancelled_by: &Address) {
+    env.events().publish(
+        (symbol_short!("INVOICE"), symbol_short!("cancelled")),
+        (invoice_id, cancelled_by.clone()),
+    );
+}
+
 // TODO: Add event emitters for each state transition:
 // - fund_invoice    -> emit "INVOICE funded"   | data: (invoice_id, client)
 // - mark_delivered  -> emit "INVOICE delivered" | data: (invoice_id, freelancer)

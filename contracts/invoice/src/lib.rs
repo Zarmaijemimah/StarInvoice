@@ -96,6 +96,35 @@ impl InvoiceContract {
         todo!("approve_payment not yet implemented")
     }
 
+    /// Cancels a Pending invoice, voiding it permanently.
+    ///
+    /// # Parameters
+    /// - `invoice_id`: ID of the invoice to cancel.
+    /// - `caller`: Address of the party requesting cancellation (freelancer or client).
+    ///
+    /// # Errors
+    /// - Panics if the invoice status is not `Pending`.
+    /// - Panics if `caller` is neither the freelancer nor the client.
+    pub fn cancel_invoice(env: Env, invoice_id: u64, caller: Address) {
+        caller.require_auth();
+
+        let mut invoice = storage::get_invoice(&env, invoice_id);
+
+        assert!(
+            invoice.status == storage::InvoiceStatus::Pending,
+            "Invoice can only be cancelled from Pending status"
+        );
+
+        assert!(
+            caller == invoice.freelancer || caller == invoice.client,
+            "Only the freelancer or client can cancel the invoice"
+        );
+
+        invoice.status = storage::InvoiceStatus::Cancelled;
+        storage::save_invoice(&env, &invoice);
+        events::invoice_cancelled(&env, invoice_id, &caller);
+    }
+
     /// Releases escrowed funds to the freelancer once the invoice is approved.
     ///
     /// # Parameters
@@ -137,5 +166,83 @@ mod tests {
         assert_eq!(invoice.freelancer, freelancer);
         assert_eq!(invoice.client, payer);
         assert_eq!(invoice.amount, 1000);
+    }
+
+    #[test]
+    fn test_cancel_invoice_by_freelancer() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let description = String::from_str(&env, "Logo design");
+
+        let invoice_id = client.create_invoice(&freelancer, &payer, &500, &description);
+        client.cancel_invoice(&invoice_id, &freelancer);
+
+        let invoice = storage::get_invoice(&env, invoice_id);
+        assert_eq!(invoice.status, storage::InvoiceStatus::Cancelled);
+    }
+
+    #[test]
+    fn test_cancel_invoice_by_client() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let description = String::from_str(&env, "SEO audit");
+
+        let invoice_id = client.create_invoice(&freelancer, &payer, &200, &description);
+        client.cancel_invoice(&invoice_id, &payer);
+
+        let invoice = storage::get_invoice(&env, invoice_id);
+        assert_eq!(invoice.status, storage::InvoiceStatus::Cancelled);
+    }
+
+    #[test]
+    #[should_panic(expected = "Only the freelancer or client can cancel the invoice")]
+    fn test_cancel_invoice_unauthorized() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let stranger = Address::generate(&env);
+        let description = String::from_str(&env, "Branding package");
+
+        let invoice_id = client.create_invoice(&freelancer, &payer, &750, &description);
+        client.cancel_invoice(&invoice_id, &stranger);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invoice can only be cancelled from Pending status")]
+    fn test_cancel_invoice_wrong_status() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client_contract = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let description = String::from_str(&env, "App development");
+
+        let invoice_id = client_contract.create_invoice(&freelancer, &payer, &3000, &description);
+
+        // Cancel once to move it out of Pending
+        client_contract.cancel_invoice(&invoice_id, &freelancer);
+
+        // Attempt to cancel again — should panic
+        client_contract.cancel_invoice(&invoice_id, &freelancer);
     }
 }
