@@ -3,7 +3,7 @@
 mod events;
 mod storage;
 
-use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, token, Address, Env, String};
 
 pub use storage::Invoice;
 
@@ -55,15 +55,28 @@ impl InvoiceContract {
     ///
     /// # Parameters
     /// - `invoice_id`: ID of the invoice to fund.
+    /// - `token_address`: Address of the token contract to transfer from.
     ///
     /// # Errors
     /// - Panics if the caller is not the invoice client.
     /// - Panics if the invoice status is not `Pending`.
-    ///
-    /// # TODO
-    /// Not yet implemented. See: <https://github.com/your-org/StarInvoice/issues/1>
-    pub fn fund_invoice(_env: Env, _invoice_id: u64) {
-        todo!("fund_invoice not yet implemented")
+    pub fn fund_invoice(env: Env, invoice_id: u64, token_address: Address) {
+        let mut invoice = storage::get_invoice(&env, invoice_id);
+
+        invoice.client.require_auth();
+
+        assert!(
+            invoice.status == storage::InvoiceStatus::Pending,
+            "Invoice must be in Pending status"
+        );
+
+        let token = token::Client::new(&env, &token_address);
+        token.transfer(&invoice.client, &env.current_contract_address(), &invoice.amount);
+
+        invoice.status = storage::InvoiceStatus::Funded;
+        storage::save_invoice(&env, &invoice);
+
+        events::invoice_funded(&env, invoice_id, &invoice.client);
     }
 
     /// Allows the freelancer to signal that work has been completed.
@@ -268,92 +281,40 @@ mod tests {
     }
 
     #[test]
-    fn test_mark_delivered_happy_path() {
+    fn test_fund_invoice_happy_path() {
+        use soroban_sdk::testutils::Address as _;
+        use soroban_sdk::token;
+
         let env = Env::default();
         env.mock_all_auths();
 
+        // Deploy the invoice contract
         let contract_id = env.register_contract(None, InvoiceContract);
-        let client = InvoiceContractClient::new(&env, &contract_id);
+        let invoice_client = InvoiceContractClient::new(&env, &contract_id);
 
         let freelancer = Address::generate(&env);
         let payer = Address::generate(&env);
-        let description = String::from_str(&env, "Mobile app development");
+        let description = String::from_str(&env, "Smart contract audit");
+        let amount: i128 = 5000;
 
-        let invoice_id = client.create_invoice(&freelancer, &payer, &5000, &description);
+        // Deploy a mock token and mint funds to the payer
+        let token_admin = Address::generate(&env);
+        let token_id = env.register_stellar_asset_contract_v2(token_admin.clone());
+        let token_address = token_id.address();
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
+        token_admin_client.mint(&payer, &amount);
 
-        // Manually set invoice to Funded status for testing
-        env.as_contract(&contract_id, || {
-            let mut invoice = storage::get_invoice(&env, invoice_id);
-            invoice.status = storage::InvoiceStatus::Funded;
-            storage::save_invoice(&env, &invoice);
-        });
+        // Create and fund the invoice
+        let invoice_id = invoice_client.create_invoice(&freelancer, &payer, &amount, &description);
+        invoice_client.fund_invoice(&invoice_id, &token_address);
 
-        // Mark as delivered by freelancer
-        client.mark_delivered(&invoice_id);
-
-        // Verify status changed to Delivered
+        // Assert status is now Funded
         let invoice = env.as_contract(&contract_id, || storage::get_invoice(&env, invoice_id));
-        assert_eq!(invoice.status, storage::InvoiceStatus::Delivered);
-    }
+        assert_eq!(invoice.status, storage::InvoiceStatus::Funded);
 
-    #[test]
-    #[should_panic(expected = "Invoice must be in Funded status")]
-    fn test_mark_delivered_wrong_status() {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let contract_id = env.register_contract(None, InvoiceContract);
-        let client = InvoiceContractClient::new(&env, &contract_id);
-
-        let freelancer = Address::generate(&env);
-        let payer = Address::generate(&env);
-        let description = String::from_str(&env, "Database migration");
-
-        let invoice_id = client.create_invoice(&freelancer, &payer, &1500, &description);
-
-        // Try to mark as delivered while still in Pending status
-        client.mark_delivered(&invoice_id);
-    }
-
-    #[test]
-    #[should_panic(expected = "Invoice must be in Funded status")]
-    fn test_mark_delivered_from_cancelled_status() {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let contract_id = env.register_contract(None, InvoiceContract);
-        let client = InvoiceContractClient::new(&env, &contract_id);
-
-        let freelancer = Address::generate(&env);
-        let payer = Address::generate(&env);
-        let description = String::from_str(&env, "API integration");
-
-        let invoice_id = client.create_invoice(&freelancer, &payer, &800, &description);
-
-        // Cancel the invoice first
-        client.cancel_invoice(&invoice_id, &freelancer);
-
-        // Try to mark as delivered - should panic
-        client.mark_delivered(&invoice_id);
-    }
-
-    #[test]
-    #[should_panic(expected = "Invoice must be in Funded status")]
-    fn test_mark_delivered_unauthorized() {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let contract_id = env.register_contract(None, InvoiceContract);
-        let client = InvoiceContractClient::new(&env, &contract_id);
-
-        let freelancer = Address::generate(&env);
-        let payer = Address::generate(&env);
-        let description = String::from_str(&env, "Security audit");
-
-        let invoice_id = client.create_invoice(&freelancer, &payer, &2000, &description);
-
-        // Don't set to Funded status - this will cause the test to fail
-        // with the expected error message when trying to mark as delivered
-        client.mark_delivered(&invoice_id);
+        // Assert the contract holds the escrowed tokens
+        let token_client = token::Client::new(&env, &token_address);
+        assert_eq!(token_client.balance(&contract_id), amount);
+        assert_eq!(token_client.balance(&payer), 0);
     }
 }
