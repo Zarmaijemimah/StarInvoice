@@ -14,8 +14,8 @@ pub enum InvoiceStatus {
     Approved,
     /// Funds have been released to the freelancer.
     Completed,
-    // TODO: Consider adding Disputed and Cancelled states
-    // See: https://github.com/your-org/StarInvoice/issues/5
+    /// Invoice has been voided by the freelancer or client.
+    Cancelled,
 }
 
 /// Core invoice data structure stored on-chain.

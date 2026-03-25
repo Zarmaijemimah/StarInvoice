@@ -17,14 +17,14 @@ pub fn invoice_created(
     );
 }
 
-/// Emits an event when a client approves delivered work.
+/// Emits an event when an invoice is cancelled.
 ///
-/// Topic: `("INVOICE", "approved")`
-/// Data:  `(invoice_id, client)`
-pub fn approve_payment(env: &Env, invoice_id: u64, client: &Address) {
+/// Topic: `("INVOICE", "cancelled")`
+/// Data:  `(invoice_id, cancelled_by)`
+pub fn invoice_cancelled(env: &Env, invoice_id: u64, cancelled_by: &Address) {
     env.events().publish(
-        (symbol_short!("INVOICE"), symbol_short!("approved")),
-        (invoice_id, client.clone()),
+        (symbol_short!("INVOICE"), symbol_short!("cancelled")),
+        (invoice_id, cancelled_by.clone()),
     );
 }
 
