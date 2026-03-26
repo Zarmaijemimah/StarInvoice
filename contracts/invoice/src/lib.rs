@@ -59,16 +59,15 @@ impl InvoiceContract {
     ///
     /// # Errors
     /// - Panics if the caller is not the invoice client.
-    /// - Panics if the invoice status is not `Pending`.
+    /// - Returns `ContractError::InvalidInvoiceStatus` if the invoice status is not `Pending`.
     pub fn fund_invoice(env: Env, invoice_id: u64, token_address: Address) -> Result<(), ContractError> {
         let mut invoice = storage::get_invoice(&env, invoice_id)?;
 
         invoice.client.require_auth();
 
-        assert!(
-            invoice.status == storage::InvoiceStatus::Pending,
-            "Invoice must be in Pending status"
-        );
+        if invoice.status != storage::InvoiceStatus::Pending {
+            return Err(ContractError::InvalidInvoiceStatus);
+        }
 
         let token = token::Client::new(&env, &token_address);
         token.transfer(&invoice.client, &env.current_contract_address(), &invoice.amount);
@@ -87,16 +86,15 @@ impl InvoiceContract {
     ///
     /// # Errors
     /// - Panics if the caller is not the invoice freelancer.
-    /// - Panics if the invoice status is not `Funded`.
+    /// - Returns `ContractError::InvalidInvoiceStatus` if the invoice status is not `Funded`.
     pub fn mark_delivered(env: Env, invoice_id: u64) -> Result<(), ContractError> {
         let mut invoice = storage::get_invoice(&env, invoice_id)?;
 
         invoice.freelancer.require_auth();
 
-        assert!(
-            invoice.status == storage::InvoiceStatus::Funded,
-            "Invoice must be in Funded status"
-        );
+        if invoice.status != storage::InvoiceStatus::Funded {
+            return Err(ContractError::InvalidInvoiceStatus);
+        }
 
         invoice.status = storage::InvoiceStatus::Delivered;
         storage::save_invoice(&env, &invoice);
@@ -112,7 +110,7 @@ impl InvoiceContract {
     ///
     /// # Errors
     /// - Panics if the caller is not the invoice client.
-    /// - Panics if the invoice status is not `Delivered`.
+    /// - Returns `ContractError::InvalidInvoiceStatus` if the invoice status is not `Delivered`.
     ///
     /// # TODO
     /// Not yet implemented. See: <https://github.com/your-org/StarInvoice/issues/3>
@@ -121,10 +119,9 @@ impl InvoiceContract {
 
         invoice.client.require_auth();
 
-        assert!(
-            invoice.status == storage::InvoiceStatus::Delivered,
-            "Invoice must be in Delivered status"
-        );
+        if invoice.status != storage::InvoiceStatus::Delivered {
+            return Err(ContractError::InvalidInvoiceStatus);
+        }
 
         invoice.status = storage::InvoiceStatus::Approved;
         storage::save_invoice(&env, &invoice);
@@ -150,22 +147,20 @@ impl InvoiceContract {
     /// - `caller`: Address of the party requesting cancellation (freelancer or client).
     ///
     /// # Errors
-    /// - Panics if the invoice status is not `Pending`.
-    /// - Panics if `caller` is neither the freelancer nor the client.
+    /// - Returns `ContractError::InvalidInvoiceStatus` if the invoice status is not `Pending`.
+    /// - Returns `ContractError::UnauthorizedCaller` if `caller` is neither the freelancer nor the client.
     pub fn cancel_invoice(env: Env, invoice_id: u64, caller: Address) -> Result<(), ContractError> {
         caller.require_auth();
 
         let mut invoice = storage::get_invoice(&env, invoice_id)?;
 
-        assert!(
-            invoice.status == storage::InvoiceStatus::Pending,
-            "Invoice can only be cancelled from Pending status"
-        );
+        if invoice.status != storage::InvoiceStatus::Pending {
+            return Err(ContractError::InvalidInvoiceStatus);
+        }
 
-        assert!(
-            caller == invoice.freelancer || caller == invoice.client,
-            "Only the freelancer or client can cancel the invoice"
-        );
+        if caller != invoice.freelancer && caller != invoice.client {
+            return Err(ContractError::UnauthorizedCaller);
+        }
 
         invoice.status = storage::InvoiceStatus::Cancelled;
         storage::save_invoice(&env, &invoice);
@@ -255,7 +250,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Only the freelancer or client can cancel the invoice")]
+    #[should_panic(expected = "Error(Contract, #3)")]
     fn test_cancel_invoice_unauthorized() {
         let env = Env::default();
         env.mock_all_auths();
@@ -273,7 +268,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Invoice can only be cancelled from Pending status")]
+    #[should_panic(expected = "Error(Contract, #2)")]
     fn test_cancel_invoice_wrong_status() {
         let env = Env::default();
         env.mock_all_auths();
@@ -395,6 +390,197 @@ mod tests {
                 assert_eq!(errors, ContractError::InvoiceNotFound.into());
             }
             _ => panic!("Expected InvoiceNotFound error"),
+        }
+    }
+
+    /// Verifies that calling `fund_invoice` twice on the same invoice fails
+    /// with `ContractError::InvalidInvoiceStatus` on the second attempt.
+    /// The payer is minted 2× the invoice amount so that insufficient balance
+    /// cannot be the cause of failure — only the status guard triggers.
+    #[test]
+    fn test_fund_invoice_double_call() {
+        use soroban_sdk::testutils::Address as _;
+        use soroban_sdk::token;
+
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let invoice_client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let description = String::from_str(&env, "Double fund guard");
+        let amount: i128 = 5000;
+
+        let token_admin = Address::generate(&env);
+        let token_id = env.register_stellar_asset_contract_v2(token_admin.clone());
+        let token_address = token_id.address();
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
+        token_admin_client.mint(&payer, &(amount * 2));
+
+        let invoice_id =
+            invoice_client.create_invoice(&freelancer, &payer, &amount, &description);
+
+        // First call succeeds
+        invoice_client.fund_invoice(&invoice_id, &token_address);
+
+        let invoice =
+            env.as_contract(&contract_id, || storage::get_invoice(&env, invoice_id).unwrap());
+        assert_eq!(invoice.status, storage::InvoiceStatus::Funded);
+
+        // Second call must fail with InvalidInvoiceStatus
+        let result = invoice_client.try_fund_invoice(&invoice_id, &token_address);
+        match result {
+            Err(Ok(error)) => {
+                assert_eq!(error, ContractError::InvalidInvoiceStatus.into());
+            }
+            _ => panic!("Expected InvalidInvoiceStatus error on second fund_invoice call"),
+        }
+    }
+
+    /// Boundary: funding a non-existent invoice returns `InvoiceNotFound`.
+    #[test]
+    fn test_fund_invoice_not_found() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let invoice_client = InvoiceContractClient::new(&env, &contract_id);
+        let token_address = Address::generate(&env);
+
+        let result = invoice_client.try_fund_invoice(&999, &token_address);
+        match result {
+            Err(Ok(error)) => {
+                assert_eq!(error, ContractError::InvoiceNotFound.into());
+            }
+            _ => panic!("Expected InvoiceNotFound error"),
+        }
+    }
+
+    /// `mark_delivered` on a Pending invoice (not yet funded) must return
+    /// `InvalidInvoiceStatus`.
+    #[test]
+    fn test_mark_delivered_on_pending_invoice() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let invoice_client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let description = String::from_str(&env, "Status guard - mark_delivered");
+
+        let invoice_id =
+            invoice_client.create_invoice(&freelancer, &payer, &1000, &description);
+
+        let result = invoice_client.try_mark_delivered(&invoice_id);
+        match result {
+            Err(Ok(error)) => {
+                assert_eq!(error, ContractError::InvalidInvoiceStatus.into());
+            }
+            _ => panic!("Expected InvalidInvoiceStatus error"),
+        }
+    }
+
+    /// `approve_payment` on a Funded (but not Delivered) invoice must return
+    /// `InvalidInvoiceStatus`.
+    #[test]
+    fn test_approve_payment_on_funded_invoice() {
+        use soroban_sdk::testutils::Address as _;
+        use soroban_sdk::token;
+
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let invoice_client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let description = String::from_str(&env, "Status guard - approve_payment");
+        let amount: i128 = 3000;
+
+        let token_admin = Address::generate(&env);
+        let token_id = env.register_stellar_asset_contract_v2(token_admin.clone());
+        let token_address = token_id.address();
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
+        token_admin_client.mint(&payer, &amount);
+
+        let invoice_id =
+            invoice_client.create_invoice(&freelancer, &payer, &amount, &description);
+        invoice_client.fund_invoice(&invoice_id, &token_address);
+
+        let result = invoice_client.try_approve_payment(&invoice_id);
+        match result {
+            Err(Ok(error)) => {
+                assert_eq!(error, ContractError::InvalidInvoiceStatus.into());
+            }
+            _ => panic!("Expected InvalidInvoiceStatus error"),
+        }
+    }
+
+    /// Cancelling a Funded invoice must return `InvalidInvoiceStatus`.
+    #[test]
+    fn test_cancel_funded_invoice_returns_error() {
+        use soroban_sdk::testutils::Address as _;
+        use soroban_sdk::token;
+
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let invoice_client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let description = String::from_str(&env, "Cancel after fund");
+        let amount: i128 = 2000;
+
+        let token_admin = Address::generate(&env);
+        let token_id = env.register_stellar_asset_contract_v2(token_admin.clone());
+        let token_address = token_id.address();
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
+        token_admin_client.mint(&payer, &amount);
+
+        let invoice_id =
+            invoice_client.create_invoice(&freelancer, &payer, &amount, &description);
+        invoice_client.fund_invoice(&invoice_id, &token_address);
+
+        let result = invoice_client.try_cancel_invoice(&invoice_id, &freelancer);
+        match result {
+            Err(Ok(error)) => {
+                assert_eq!(error, ContractError::InvalidInvoiceStatus.into());
+            }
+            _ => panic!("Expected InvalidInvoiceStatus error"),
+        }
+    }
+
+    /// A stranger (neither freelancer nor client) attempting to cancel must
+    /// receive `UnauthorizedCaller`.
+    #[test]
+    fn test_cancel_invoice_stranger_returns_error() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let invoice_client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let stranger = Address::generate(&env);
+        let description = String::from_str(&env, "Unauthorized cancel");
+
+        let invoice_id =
+            invoice_client.create_invoice(&freelancer, &payer, &750, &description);
+
+        let result = invoice_client.try_cancel_invoice(&invoice_id, &stranger);
+        match result {
+            Err(Ok(error)) => {
+                assert_eq!(error, ContractError::UnauthorizedCaller.into());
+            }
+            _ => panic!("Expected UnauthorizedCaller error"),
         }
     }
 }

@@ -5,6 +5,8 @@ use soroban_sdk::{contracterror, contracttype, Address, Env, String};
 #[repr(u32)]
 pub enum ContractError {
     InvoiceNotFound = 1,
+    InvalidInvoiceStatus = 2,
+    UnauthorizedCaller = 3,
 }
 
 /// Represents the lifecycle state of an invoice.
