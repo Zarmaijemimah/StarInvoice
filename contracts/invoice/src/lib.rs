@@ -34,6 +34,8 @@ impl InvoiceContract {
     ) -> u64 {
         freelancer.require_auth();
 
+        assert!(freelancer != client, "Client and freelancer must be different addresses");
+
         let invoice_id = storage::next_invoice_id(&env);
 
         let invoice = Invoice {
@@ -192,6 +194,21 @@ impl InvoiceContract {
 mod tests {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Env, String};
+
+    #[test]
+    #[should_panic(expected = "Client and freelancer must be different addresses")]
+    fn test_create_invoice_client_equals_freelancer() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let description = String::from_str(&env, "Self-invoice");
+
+        client.create_invoice(&freelancer, &freelancer, &1000, &description);
+    }
 
     #[test]
     fn test_create_invoice() {
