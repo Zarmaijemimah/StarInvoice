@@ -1,8 +1,16 @@
-use soroban_sdk::{contracttype, Address, Env, String};
+use soroban_sdk::{contracterror, contracttype, Address, Env, String};
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum ContractError {
+    InvoiceNotFound = 1,
+    ClientIsFreelancer = 2,
+}
 
 /// Represents the lifecycle state of an invoice.
 #[contracttype]
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum InvoiceStatus {
     /// Invoice created, awaiting client funding.
     Pending,
@@ -14,8 +22,8 @@ pub enum InvoiceStatus {
     Approved,
     /// Funds have been released to the freelancer.
     Completed,
-    // TODO: Consider adding Disputed and Cancelled states
-    // See: https://github.com/your-org/StarInvoice/issues/5
+    /// Invoice has been voided by the freelancer or client.
+    Cancelled,
 }
 
 /// Core invoice data structure stored on-chain.
@@ -32,11 +40,12 @@ pub struct Invoice {
     pub amount: i128,
     /// Human-readable description of the work to be performed.
     pub description: String,
+    /// Address of the token contract used for payment.
+    pub token: Address,
+    /// Unix timestamp after which the invoice can no longer be funded.
+    pub deadline: u64,
     /// Current state of the invoice in the escrow lifecycle.
     pub status: InvoiceStatus,
-    // TODO: Add deadline / expiry field
-    // TODO: Add token address field for multi-token support
-    // See: https://github.com/your-org/StarInvoice/issues/6
 }
 
 #[contracttype]
@@ -45,30 +54,44 @@ enum DataKey {
     InvoiceCount,
 }
 
+/// Returns the current invoice count.
+pub fn get_invoice_count(env: &Env) -> u64 {
+    env.storage()
+        .instance()
+        .get(&DataKey::InvoiceCount)
+        .unwrap_or(0)
+}
+
 /// Returns the next available invoice ID and increments the counter.
+///
+/// Storage: persistent — the counter must survive contract upgrades and
+/// instance expiry. Losing it would cause ID collisions with existing invoices.
 pub fn next_invoice_id(env: &Env) -> u64 {
     let count: u64 = env
         .storage()
-        .instance()
+        .persistent()
         .get(&DataKey::InvoiceCount)
         .unwrap_or(0);
     env.storage()
-        .instance()
+        .persistent()
         .set(&DataKey::InvoiceCount, &(count + 1));
     count
 }
 
 /// Persists an invoice to on-chain storage, keyed by its ID.
+///
+/// Storage: persistent — invoices hold escrowed funds and must remain
+/// accessible for the full escrow lifecycle, independent of instance TTL.
 pub fn save_invoice(env: &Env, invoice: &Invoice) {
     env.storage()
         .persistent()
         .set(&DataKey::Invoice(invoice.id), invoice);
 }
 
-/// Retrieves an invoice by ID. Panics if the invoice does not exist.
-pub fn get_invoice(env: &Env, invoice_id: u64) -> Invoice {
+/// Retrieves an invoice by ID. Returns Result::Err if not found.
+pub fn get_invoice(env: &Env, invoice_id: u64) -> Result<Invoice, ContractError> {
     env.storage()
         .persistent()
         .get(&DataKey::Invoice(invoice_id))
-        .expect("Invoice not found")
+        .ok_or(ContractError::InvoiceNotFound)
 }
