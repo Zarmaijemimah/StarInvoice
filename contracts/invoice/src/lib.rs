@@ -170,7 +170,6 @@ impl InvoiceContract {
         invoice.status = storage::InvoiceStatus::Cancelled;
         storage::save_invoice(&env, &invoice);
         events::invoice_cancelled(&env, invoice_id, &caller);
-
         Ok(())
     }
 
