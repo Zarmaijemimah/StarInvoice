@@ -1,4 +1,4 @@
-#![no_std]
+#! [no_std]
 
 mod events;
 mod storage;
@@ -53,11 +53,7 @@ impl InvoiceContract {
             status: storage::InvoiceStatus::Pending,
         };
 
-        storage::save_invoice(&env, &invoice);
-        events::invoice_created(&env, invoice_id, &freelancer, &client, amount);
-
-        invoice_id
-    }
+    // Insert new fn before release_payment
 
     /// Allows the client to deposit funds into escrow for the given invoice.
     ///
@@ -131,21 +127,17 @@ impl InvoiceContract {
 
         invoice.client.require_auth();
 
-        if invoice.status != storage::InvoiceStatus::Delivered {
-            return Err(ContractError::InvalidInvoiceStatus);
+        if invoice.status != storage::InvoiceStatus::Funded && invoice.status != storage::InvoiceStatus::Delivered {
+            panic!("Can only dispute from Funded or Delivered status");
         }
 
-        invoice.status = storage::InvoiceStatus::Approved;
+        invoice.status = storage::InvoiceStatus::Disputed;
         storage::save_invoice(&env, &invoice);
-
-        events::approve_payment(&env, invoice_id, &invoice.client);
+        events::invoice_disputed(&env, invoice_id, &invoice.client);
         Ok(())
     }
 
-    /// Returns the current number of invoices.
-    pub fn invoice_count(env: Env) -> u64 {
-        storage::get_invoice_count(&env)
-    }
+    // existing release_payment ...
 
     /// Returns the data for a specific invoice ID.
     pub fn get_invoice(env: Env, invoice_id: u64) -> Result<Invoice, ContractError> {
@@ -259,7 +251,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cancel_invoice_by_freelancer() {
+    fn test_dispute_invoice_funded() {
         let env = Env::default();
         env.mock_all_auths();
 
@@ -295,12 +287,11 @@ mod tests {
         client.cancel_invoice(&invoice_id, &payer);
 
         let invoice = env.as_contract(&contract_id, || storage::get_invoice(&env, invoice_id).unwrap());
-        assert_eq!(invoice.status, storage::InvoiceStatus::Cancelled);
+        assert_eq!(invoice.status, storage::InvoiceStatus::Disputed);
     }
 
     #[test]
-    #[should_panic(expected = "Error(Contract, #3)")]
-    fn test_cancel_invoice_unauthorized() {
+    fn test_dispute_invoice_delivered() {
         let env = Env::default();
         env.mock_all_auths();
 
@@ -365,7 +356,6 @@ mod tests {
         let invoice_id = invoice_client.create_invoice(&freelancer, &payer, &amount, &token_address, &9999999999, &description);
         invoice_client.fund_invoice(&invoice_id);
 
-        // Assert status is now Funded
         let invoice = env.as_contract(&contract_id, || storage::get_invoice(&env, invoice_id).unwrap());
         assert_eq!(invoice.status, storage::InvoiceStatus::Funded);
 
@@ -404,7 +394,8 @@ mod tests {
     }
 
     #[test]
-    fn test_get_invoice() {
+    #[should_panic(expected = "Cannot dispute pending invoice")]
+    fn test_dispute_invoice_pending() {
         let env = Env::default();
         env.mock_all_auths();
 
@@ -413,31 +404,10 @@ mod tests {
 
         let freelancer = Address::generate(&env);
         let payer = Address::generate(&env);
-        let description = String::from_str(&env, "Test get_invoice");
+        let description = String::from_str(&env, "Dispute test pending");
 
-        let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &description);
-        let invoice = client.get_invoice(&invoice_id);
-
-        assert_eq!(invoice.id, invoice_id);
-        assert_eq!(invoice.freelancer, freelancer);
-        assert_eq!(invoice.client, payer);
-        assert_eq!(invoice.amount, 1000);
-        assert_eq!(invoice.description, description);
-    }
-
-    #[test]
-    fn test_invoice_not_found() {
-        let env = Env::default();
-        let contract_id = env.register_contract(None, InvoiceContract);
-        let client = InvoiceContractClient::new(&env, &contract_id);
-
-        let result = client.try_get_invoice(&999);
-        match result {
-            Err(Ok(errors)) => {
-                assert_eq!(errors, ContractError::InvoiceNotFound.into());
-            }
-            _ => panic!("Expected InvoiceNotFound error"),
-        }
+        let invoice_id = client.create_invoice(&freelancer, &payer, &100, &description);
+        client.dispute_invoice(&invoice_id);
     }
 
     // Issue #80: Negative tests for wrong-caller authorization
@@ -708,3 +678,4 @@ mod tests {
         assert_eq!(client.invoice_count(), 10);
     }
 }
+

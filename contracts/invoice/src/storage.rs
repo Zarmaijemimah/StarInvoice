@@ -18,6 +18,8 @@ pub enum InvoiceStatus {
     Funded,
     /// Freelancer has marked work as delivered.
     Delivered,
+    /// Client disputes the invoice.
+    Disputed,
     /// Client has approved the delivery.
     Approved,
     /// Funds have been released to the freelancer.
