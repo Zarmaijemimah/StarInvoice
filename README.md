@@ -39,9 +39,9 @@ stateDiagram-v2
 | Function          | Status        |
 |-------------------|---------------|
 | `create_invoice`  | ✅ Implemented |
-| `fund_invoice`    | 🚧 TODO        |
+| `fund_invoice`    | ✅ Implemented |
 | `mark_delivered`  | ✅ Implemented |
-| `approve_payment` | 🚧 TODO        |
+| `approve_payment` | ✅ Implemented |
 | `release_payment` | ✅ Implemented |
 
 ## Project Structure
