@@ -32,7 +32,7 @@ pub fn invoice_cancelled(env: &Env, invoice_id: u64, cancelled_by: &Address) {
 ///
 /// Topic: `("INVOICE", "approved")`
 /// Data:  `(invoice_id, client)`
-pub fn approve_payment(env: &Env, invoice_id: u64, client: &Address) {
+pub fn invoice_approved(env: &Env, invoice_id: u64, client: &Address) {
     env.events().publish(
         (symbol_short!("INVOICE"), symbol_short!("approved")),
         (invoice_id, client.clone()),

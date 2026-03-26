@@ -129,7 +129,7 @@ impl InvoiceContract {
         invoice.status = storage::InvoiceStatus::Approved;
         storage::save_invoice(&env, &invoice);
 
-        events::approve_payment(&env, invoice_id, &invoice.client);
+        events::invoice_approved(&env, invoice_id, &invoice.client);
         Ok(())
     }
 
