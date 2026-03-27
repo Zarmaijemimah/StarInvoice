@@ -61,6 +61,17 @@ pub fn invoice_cancelled(env: &Env, invoice_id: u64, cancelled_by: &Address) {
     );
 }
 
+/// Emits an event when a client disputes a delivered or funded invoice.
+///
+/// Topic: `("INVOICE", "disputed")`
+/// Data:  `(invoice_id, client)`
+pub fn invoice_disputed(env: &Env, invoice_id: u64, client: &Address) {
+    env.events().publish(
+        (symbol_short!("INVOICE"), symbol_short!("disputed")),
+        (invoice_id, client.clone()),
+    );
+}
+
 /// Emits an event when escrowed funds are released to the freelancer.
 ///
 /// Topic: `("INVOICE", "released")`

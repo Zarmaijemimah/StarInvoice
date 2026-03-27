@@ -10,3 +10,6 @@ pub const TTL_THRESHOLD: u32 = 518400; // ~30 days (assuming 5-second ledgers)
 /// TTL extension duration (in ledgers).
 /// When extending TTL, entries will be extended to this duration.
 pub const TTL_EXTEND_TO: u32 = 1036800; // ~60 days (assuming 5-second ledgers)
+
+/// Maximum length of invoice description in bytes.
+pub const MAX_DESCRIPTION_LEN: usize = 256;

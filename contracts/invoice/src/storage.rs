@@ -1,9 +1,9 @@
 use soroban_sdk::{contracterror, contracttype, Address, Env, String};
-use crate::constants::{TTL_THRESHOLD, TTL_EXTEND_TO};
+use crate::constants::{TTL_THRESHOLD, TTL_EXTEND_TO, MAX_DESCRIPTION_LEN};
 
 /// Contract-level errors returned by state-changing functions.
 #[contracterror]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ContractError {
     /// The invoice does not exist.
     InvoiceNotFound = 1,
@@ -11,6 +11,8 @@ pub enum ContractError {
     InvalidInvoiceStatus = 2,
     /// The caller is not authorised to perform this operation.
     UnauthorizedCaller = 3,
+    /// The description exceeds the maximum allowed length.
+    DescriptionTooLong = 4,
 }
 
 /// Represents the lifecycle state of an invoice.
@@ -63,6 +65,8 @@ pub struct Invoice {
 enum DataKey {
     Invoice(u64),
     InvoiceCount,
+    InvoicesByFreelancer(Address),
+    InvoicesByClient(Address),
 }
 
 /// Returns the current invoice count.
@@ -74,6 +78,12 @@ pub fn get_invoice_count(env: &Env) -> u64 {
 }
 
 /// Returns the next available invoice ID and increments the counter.
+/// 
+/// NOTE: Soroban transactions are atomic at the transaction level. Each transaction
+/// is executed in isolation and either fully succeeds or fully fails. Therefore,
+/// even though this function performs two storage operations (read and write),
+/// they are guaranteed to be atomic within a single transaction. No race condition
+/// can occur because concurrent transactions are serialized by the ledger.
 pub fn next_invoice_id(env: &Env) -> u64 {
     let count: u64 = env
         .storage()
@@ -93,6 +103,34 @@ pub fn save_invoice(env: &Env, invoice: &Invoice) {
     env.storage()
         .persistent()
         .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+
+    // Update freelancer index
+    let freelancer_key = DataKey::InvoicesByFreelancer(invoice.freelancer.clone());
+    let mut freelancer_invoices = env
+        .storage()
+        .persistent()
+        .get::<_, soroban_sdk::Vec<u64>>(&freelancer_key)
+        .unwrap_or_else(|| soroban_sdk::Vec::new(env));
+    if !freelancer_invoices.iter().any(|id| id == invoice.id) {
+        freelancer_invoices.push_back(invoice.id);
+        env.storage()
+            .persistent()
+            .set(&freelancer_key, &freelancer_invoices);
+    }
+
+    // Update client index
+    let client_key = DataKey::InvoicesByClient(invoice.client.clone());
+    let mut client_invoices = env
+        .storage()
+        .persistent()
+        .get::<_, soroban_sdk::Vec<u64>>(&client_key)
+        .unwrap_or_else(|| soroban_sdk::Vec::new(env));
+    if !client_invoices.iter().any(|id| id == invoice.id) {
+        client_invoices.push_back(invoice.id);
+        env.storage()
+            .persistent()
+            .set(&client_key, &client_invoices);
+    }
 }
 
 /// Retrieves an invoice by ID, returning an error if not found.
@@ -107,4 +145,22 @@ pub fn get_invoice(env: &Env, invoice_id: u64) -> Result<Invoice, ContractError>
         .persistent()
         .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
     Ok(invoice)
+}
+
+/// Returns all invoice IDs for a given freelancer.
+pub fn get_invoices_by_freelancer(env: &Env, freelancer: &Address) -> soroban_sdk::Vec<u64> {
+    let key = DataKey::InvoicesByFreelancer(freelancer.clone());
+    env.storage()
+        .persistent()
+        .get(&key)
+        .unwrap_or_else(|| soroban_sdk::Vec::new(env))
+}
+
+/// Returns all invoice IDs for a given client.
+pub fn get_invoices_by_client(env: &Env, client: &Address) -> soroban_sdk::Vec<u64> {
+    let key = DataKey::InvoicesByClient(client.clone());
+    env.storage()
+        .persistent()
+        .get(&key)
+        .unwrap_or_else(|| soroban_sdk::Vec::new(env))
 }
