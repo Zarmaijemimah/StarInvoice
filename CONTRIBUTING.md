@@ -33,6 +33,18 @@ Each TODO in the codebase maps to a GitHub issue:
 
 ## Code Style
 
+Use the Makefile for common development tasks:
+
+```bash
+make build       # compile to wasm32-unknown-unknown --release
+make test        # run all tests
+make fmt         # format code
+make lint        # run clippy with strict warnings
+make clean       # remove build artifacts
+```
+
+Or use cargo directly:
+
 ```bash
 cargo fmt        # format
 cargo clippy     # lint

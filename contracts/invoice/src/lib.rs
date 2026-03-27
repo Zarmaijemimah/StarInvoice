@@ -38,10 +38,14 @@ impl InvoiceContract {
         token: Address,
         deadline: u64,
         description: String,
-    ) -> u64 {
+    ) -> Result<u64, ContractError> {
         freelancer.require_auth();
 
         assert!(freelancer != client, "Client and freelancer must be different addresses");
+
+        if description.len() > constants::MAX_DESCRIPTION_LEN {
+            return Err(ContractError::DescriptionTooLong);
+        }
 
         let invoice_id = storage::next_invoice_id(&env);
 
@@ -59,7 +63,7 @@ impl InvoiceContract {
 
         storage::save_invoice(&env, &invoice);
         events::invoice_created(&env, invoice_id, &freelancer, &client, amount);
-        invoice_id
+        Ok(invoice_id)
     }
 
     /// Allows the client to deposit funds into escrow for the given invoice.
