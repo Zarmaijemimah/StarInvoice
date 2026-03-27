@@ -23,6 +23,8 @@ pub enum InvoiceStatus {
     Completed,
     /// Invoice has been voided by the freelancer or client.
     Cancelled,
+    /// Invoice is currently under dispute.
+    Disputed,
 }
 
 /// Core invoice data structure stored on-chain.

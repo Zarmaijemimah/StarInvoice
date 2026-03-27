@@ -82,3 +82,15 @@ pub fn invoice_refunded(env: &Env, invoice_id: u64, client: &Address, amount: i1
         (invoice_id, client.clone(), amount),
     );
 }
+
+/// Emits an event when an invoice is disputed.
+///
+/// Topic: `("INVOICE", "disputed")`
+/// Data:  `(invoice_id, caller)`
+pub fn invoice_disputed(env: &Env, invoice_id: u64, caller: &Address) {
+    env.events().publish(
+        (symbol_short!("INVOICE"), symbol_short!("disputed")),
+        (invoice_id, caller.clone()),
+    );
+}
+

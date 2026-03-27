@@ -191,6 +191,36 @@ impl InvoiceContract {
 
         todo!("release_payment token transfer not yet implemented")
     }
+
+    /// Allows either party to dispute an invoice.
+    ///
+    /// # Parameters
+    /// - `invoice_id`: ID of the invoice to dispute.
+    /// - `caller`: Address of the party raising the dispute (freelancer or client).
+    ///
+    /// # Errors
+    /// - Panics if the invoice status is not `Funded` or `Delivered`.
+    /// - Panics if `caller` is neither the freelancer nor the client.
+    pub fn dispute_invoice(env: Env, invoice_id: u64, caller: Address) -> Result<(), ContractError> {
+        caller.require_auth();
+
+        let mut invoice = storage::get_invoice(&env, invoice_id)?;
+
+        assert!(
+            invoice.status == storage::InvoiceStatus::Funded || invoice.status == storage::InvoiceStatus::Delivered,
+            "Invoice can only be disputed from Funded or Delivered status"
+        );
+
+        assert!(
+            caller == invoice.freelancer || caller == invoice.client,
+            "Only the freelancer or client can dispute the invoice"
+        );
+
+        invoice.status = storage::InvoiceStatus::Disputed;
+        storage::save_invoice(&env, &invoice);
+        events::invoice_disputed(&env, invoice_id, &caller);
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -401,5 +431,58 @@ mod tests {
             }
             _ => panic!("Expected InvoiceNotFound error"),
         }
+    }
+
+    #[test]
+    fn test_dispute_invoice_by_client() {
+        use soroban_sdk::testutils::Address as _;
+        use soroban_sdk::token;
+
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let invoice_client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let description = String::from_str(&env, "Dispute case");
+        let amount: i128 = 2000;
+
+        let token_admin = Address::generate(&env);
+        let token_id = env.register_stellar_asset_contract_v2(token_admin.clone());
+        let token_address = token_id.address();
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
+        token_admin_client.mint(&payer, &amount);
+
+        let invoice_id = invoice_client.create_invoice(&freelancer, &payer, &amount, &description);
+        invoice_client.fund_invoice(&invoice_id, &token_address);
+
+        // Dispute from Funded status
+        invoice_client.dispute_invoice(&invoice_id, &payer);
+
+        let invoice = invoice_client.get_invoice(&invoice_id);
+        assert_eq!(invoice.status, storage::InvoiceStatus::Disputed);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invoice can only be disputed from")]
+    fn test_dispute_invoice_invalid_status() {
+        use soroban_sdk::testutils::Address as _;
+
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let invoice_client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let description = String::from_str(&env, "Status dispute");
+
+        let invoice_id = invoice_client.create_invoice(&freelancer, &payer, &100, &description);
+
+        // It is Pending here, not Funded/Delivered.
+        let _ = invoice_client.dispute_invoice(&invoice_id, &freelancer);
     }
 }
