@@ -59,8 +59,18 @@ pub fn mark_delivered(env: &Env, invoice_id: u64, freelancer: &Address) {
 
 // TODO: Add event emitters for each state transition:
 // - mark_delivered  -> emit "INVOICE delivered" | data: (invoice_id, freelancer)
-// - release_payment -> emit "INVOICE released"  | data: (invoice_id, amount)
 // See: https://github.com/your-org/StarInvoice/issues/7
+
+/// Emits an event when an invoice payment is released to the freelancer.
+///
+/// Topic: `("INVOICE", "released")`
+/// Data:  `(invoice_id, freelancer, amount)`
+pub fn invoice_released(env: &Env, invoice_id: u64, freelancer: &Address, amount: i128) {
+    env.events().publish(
+        (symbol_short!("INVOICE"), symbol_short!("released")),
+        (invoice_id, freelancer.clone(), amount),
+    );
+}
 
 /// Emits an event when an invoice is refunded to the client.
 ///

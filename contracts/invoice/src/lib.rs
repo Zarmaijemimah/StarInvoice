@@ -183,8 +183,13 @@ impl InvoiceContract {
     ///
     /// # TODO
     /// Not yet implemented. See: <https://github.com/your-org/StarInvoice/issues/4>
-    pub fn release_payment(_env: Env, _invoice_id: u64) {
-        todo!("release_payment not yet implemented")
+    pub fn release_payment(env: Env, invoice_id: u64) -> Result<(), ContractError> {
+        let invoice = storage::get_invoice(&env, invoice_id)?;
+        
+        // Emit the event
+        events::invoice_released(&env, invoice_id, &invoice.freelancer, invoice.amount);
+
+        todo!("release_payment token transfer not yet implemented")
     }
 }
 
