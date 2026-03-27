@@ -11,6 +11,17 @@ pub use storage::{ContractError, Invoice, InvoiceStatus};
 /// Validates whether a status transition is allowed.
 ///
 /// Returns `true` if transitioning `from` → `to` is a legal state change.
+///
+/// Valid transitions:
+/// ```text
+/// Pending   → Funded
+/// Pending   → Cancelled
+/// Funded    → Delivered
+/// Funded    → Disputed
+/// Delivered → Approved
+/// Delivered → Disputed
+/// Approved  → Completed
+/// ```
 pub fn validate_transition(from: &InvoiceStatus, to: &InvoiceStatus) -> bool {
     matches!(
         (from, to),
@@ -141,6 +152,23 @@ impl InvoiceContract {
 
         storage::update_invoice_status(&env, invoice_id, storage::InvoiceStatus::Cancelled);
         events::invoice_cancelled(&env, invoice_id, &caller);
+        Ok(())
+    }
+
+    /// Raises a dispute on a Funded or Delivered invoice.
+    pub fn dispute_invoice(env: Env, invoice_id: u64) -> Result<(), ContractError> {
+        let mut invoice = storage::get_invoice(&env, invoice_id)?;
+
+        invoice.client.require_auth();
+
+        if !validate_transition(&invoice.status, &InvoiceStatus::Disputed) {
+            return Err(ContractError::InvalidInvoiceStatus);
+        }
+
+        invoice.status = InvoiceStatus::Disputed;
+        storage::save_invoice(&env, &invoice);
+
+        events::invoice_disputed(&env, invoice_id, &invoice.client);
         Ok(())
     }
 

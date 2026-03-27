@@ -45,7 +45,7 @@ mod tests {
 
         contract_client.cancel_invoice(&invoice_id, &freelancer);
 
-        let invoice = contract_client.get_invoice(&invoice_id).unwrap();
+        let invoice = contract_client.get_invoice(&invoice_id);
         assert_eq!(invoice.status, InvoiceStatus::Cancelled);
     }
 
@@ -62,7 +62,7 @@ mod tests {
 
         contract_client.cancel_invoice(&invoice_id, &client);
 
-        let invoice = contract_client.get_invoice(&invoice_id).unwrap();
+        let invoice = contract_client.get_invoice(&invoice_id);
         assert_eq!(invoice.status, InvoiceStatus::Cancelled);
     }
 
