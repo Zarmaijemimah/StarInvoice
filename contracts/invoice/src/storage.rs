@@ -3,7 +3,7 @@ use crate::constants::{TTL_THRESHOLD, TTL_EXTEND_TO};
 
 /// Contract-level errors returned by state-changing functions.
 #[contracterror]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ContractError {
     /// The invoice does not exist.
     InvoiceNotFound = 1,
