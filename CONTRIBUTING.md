@@ -33,11 +33,15 @@ Each TODO in the codebase maps to a GitHub issue:
 
 ## Code Style
 
+This project uses `rustfmt.toml` to enforce consistent formatting. All code must pass formatting checks before merging.
+
 ```bash
-cargo fmt        # format
+cargo fmt        # format (must pass before committing)
 cargo clippy     # lint
 cargo test       # test
 ```
+
+Ensure `cargo fmt` passes on all changes before opening a PR.
 
 ## Pull Request Process
 
