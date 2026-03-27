@@ -108,3 +108,13 @@ pub fn get_invoice(env: &Env, invoice_id: u64) -> Result<Invoice, ContractError>
         .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
     Ok(invoice)
 }
+
+/// Updates the status of an existing invoice and persists it.
+/// Boilerplate reducer for inline mutability and saving.
+pub fn update_invoice_status(env: &Env, invoice_id: u64, new_status: InvoiceStatus) {
+    if let Ok(mut invoice) = get_invoice(env, invoice_id) {
+        invoice.status = new_status;
+        save_invoice(env, &invoice);
+    }
+}
+
