@@ -89,8 +89,9 @@ invoice
     /// - `token_address`: Address of the token contract to transfer from.
     ///
     /// # Errors
-    /// - Panics if the caller is not the invoice client.
-    /// - Panics if the invoice status is not `Pending`.
+    /// - Returns `InvalidInvoiceStatus` if the caller is not the invoice client.
+    /// - Returns `InvalidInvoiceStatus` if the invoice status is not `Pending`.
+    /// - Returns `TokenMismatch` if the provided token does not match the invoice's token.
     pub fn fund_invoice(env: Env, invoice_id: u64, token_address: Address) -> Result<(), ContractError> {
         let invoice = storage::get_invoice(&env, invoice_id)?;
 
@@ -98,6 +99,11 @@ invoice
 
         if !validate_transition(&invoice.status, &InvoiceStatus::Funded) {
             return Err(ContractError::InvalidInvoiceStatus);
+        }
+
+        // Validate that the provided token matches the invoice's token
+        if token_address != invoice.token {
+            return Err(ContractError::TokenMismatch);
         }
 
         let token_client = token::Client::new(&env, &invoice.token);
