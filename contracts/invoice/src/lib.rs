@@ -54,6 +54,11 @@ impl InvoiceContract {
         freelancer.require_auth();
 
         assert!(amount > 0, "Invoice amount must be greater than zero");
+        
+        if amount > constants::MAX_INVOICE_AMOUNT {
+            return Err(ContractError::AmountExceedsMaximum);
+        }
+        
         assert!(freelancer != client, "Client and freelancer must be different addresses");
 
         if description.len() > constants::MAX_DESCRIPTION_LEN {
@@ -69,10 +74,8 @@ impl InvoiceContract {
             amount,
             token,
             deadline,
-invoice
             title,
-=======
-            created_at: env.ledger().timestamp(), main
+            created_at: env.ledger().timestamp(),
             description,
             status: InvoiceStatus::Pending,
         };
@@ -237,9 +240,7 @@ mod tests {
 
         client.create_invoice(&freelancer, &freelancer, &1000, &Address::generate(&env), &9999999999, &title, &description);
     }
-=======
     use soroban_sdk::{testutils::Address as _, Env, String};
- main
 
     #[test]
     fn test_create_invoice() {
@@ -257,11 +258,9 @@ mod tests {
         let description = String::from_str(&env, "Website redesign - Phase 1");
 
         let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &token_address, &9999999999, &title, &description);
-=======
         let description = String::from_str(&env, "Website redesign - Phase 1");
 
         let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &description);
- main
 
         assert_eq!(invoice_id, 0);
 
@@ -288,11 +287,9 @@ mod tests {
         let description = String::from_str(&env, "Logo design");
 
         let invoice_id = client.create_invoice(&freelancer, &payer, &500, &token_address, &9999999999, &title, &description);
-=======
         let description = String::from_str(&env, "Logo design");
 
         let invoice_id = client.create_invoice(&freelancer, &payer, &500, &description);
- main
         client.cancel_invoice(&invoice_id, &freelancer);
 
         let invoice = env.as_contract(&contract_id, || storage::get_invoice(&env, invoice_id).unwrap());
@@ -315,11 +312,9 @@ mod tests {
         let description = String::from_str(&env, "SEO audit");
 
         let invoice_id = client.create_invoice(&freelancer, &payer, &200, &token_address, &9999999999, &title, &description);
-=======
         let description = String::from_str(&env, "SEO audit");
 
         let invoice_id = client.create_invoice(&freelancer, &payer, &200, &description);
-      main
         client.cancel_invoice(&invoice_id, &payer);
 
         let invoice = env.as_contract(&contract_id, || storage::get_invoice(&env, invoice_id).unwrap());
@@ -341,8 +336,6 @@ mod tests {
       invoice
         let token_address = setup_token(&env);
         let title = String::from_str(&env, "Branding Package");
-=======
- main
         let description = String::from_str(&env, "Branding package");
 
         let invoice_id = client.create_invoice(&freelancer, &payer, &750, &token_address, &9999999999, &title, &description);
@@ -366,13 +359,11 @@ mod tests {
         let description = String::from_str(&env, "App development");
 
         let invoice_id = client_contract.create_invoice(&freelancer, &payer, &3000, &token_address, &9999999999, &title, &description);
-=======
         let description = String::from_str(&env, "App development");
 
         let invoice_id = client_contract.create_invoice(&freelancer, &payer, &3000, &description);
 
         // Cancel once to move it out of Pending
- main
         client_contract.cancel_invoice(&invoice_id, &freelancer);
 
         // Attempt to cancel again — should panic
@@ -416,8 +407,6 @@ mod tests {
     }
 
     #[test]
-=======
- main
     fn test_fund_invoice_happy_path() {
         use soroban_sdk::testutils::Address as _;
         use soroban_sdk::token;
@@ -524,7 +513,6 @@ mod tests {
         let description = String::from_str(&env, "Test funding");
 
         let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &Address::generate(&env), &9999999999, &title, &description);
-=======
         if !validate_transition(&invoice.status, &InvoiceStatus::Completed) {
             return Err(ContractError::InvalidInvoiceStatus);
         }
@@ -534,7 +522,6 @@ mod tests {
 
         invoice.status = InvoiceStatus::Completed;
         storage::save_invoice(&env, &invoice);
- main
 
         events::release_payment(&env, invoice_id, &invoice.freelancer, invoice.amount);
         Ok(())
@@ -601,7 +588,6 @@ mod tests {
         // Try to approve as freelancer (wrong caller) - should panic
         let _ = client.approve_payment(&invoice_id);
     }
-=======
     /// Returns the data for a specific invoice ID.
     pub fn get_invoice(env: Env, invoice_id: u64) -> Result<Invoice, ContractError> {
         storage::get_invoice(&env, invoice_id)
@@ -611,7 +597,6 @@ mod tests {
     fn test_dispute_invoice_by_client() {
         use soroban_sdk::testutils::Address as _;
         use soroban_sdk::token;
- main
 
         let env = Env::default();
         env.mock_all_auths();
@@ -626,10 +611,8 @@ mod tests {
         let description = String::from_str(&env, "Test double funding");
 
         let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &Address::generate(&env), &9999999999, &title, &description);
-=======
         let description = String::from_str(&env, "Dispute case");
         let amount: i128 = 2000;
- main
 
         let token_admin = Address::generate(&env);
         let token_id = env.register_stellar_asset_contract_v2(token_admin.clone());
@@ -678,7 +661,6 @@ mod tests {
         let description = String::from_str(&env, "Test approve on funded");
 
         let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &Address::generate(&env), &9999999999, &title, &description);
-=======
         token_admin_client.mint(&payer, &amount);
 
         let invoice_id = invoice_client.create_invoice(&freelancer, &payer, &amount, &description);
@@ -686,7 +668,6 @@ mod tests {
 
         // Dispute from Funded status
         invoice_client.dispute_invoice(&invoice_id, &payer);
- main
 
         let invoice = invoice_client.get_invoice(&invoice_id);
         assert_eq!(invoice.status, storage::InvoiceStatus::Disputed);
@@ -720,11 +701,9 @@ mod tests {
         // Try to release on delivered (not approved) - should panic
         let _ = client.release_payment(&invoice_id, &token_address);
     }
-=======
     #[should_panic(expected = "Invoice can only be disputed from")]
     fn test_dispute_invoice_invalid_status() {
         use soroban_sdk::testutils::Address as _;
- main
 
         let env = Env::default();
         env.mock_all_auths();
@@ -812,11 +791,9 @@ mod tests {
         }
 
         assert_eq!(client.invoice_count(), 10);
-=======
         let invoice_id = invoice_client.create_invoice(&freelancer, &payer, &100, &description);
 
         // It is Pending here, not Funded/Delivered.
         let _ = invoice_client.dispute_invoice(&invoice_id, &freelancer);
- main
     }
 }

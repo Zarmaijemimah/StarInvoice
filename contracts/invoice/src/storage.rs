@@ -13,6 +13,8 @@ pub enum ContractError {
     UnauthorizedCaller = 3,
     /// The description exceeds the maximum allowed length.
     DescriptionTooLong = 4,
+    /// The invoice amount exceeds the maximum allowed amount.
+    AmountExceedsMaximum = 5,
 }
 
 /// Represents the lifecycle state of an invoice.
