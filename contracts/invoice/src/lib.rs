@@ -52,6 +52,7 @@ impl InvoiceContract {
     ) -> Result<u64, ContractError> {
         freelancer.require_auth();
 
+        assert!(amount > 0, "Invoice amount must be greater than zero");
         assert!(freelancer != client, "Client and freelancer must be different addresses");
 
         if description.len() > constants::MAX_DESCRIPTION_LEN {
@@ -173,51 +174,36 @@ impl InvoiceContract {
     }
 
     /// Releases escrowed funds to the freelancer once the invoice is approved.
-    ///
-    /// # Parameters
-    /// - `invoice_id`: ID of the invoice to settle.
-    ///
-    /// # Errors
-    /// - Panics if the invoice status is not `Approved`.
-    ///
-    /// # TODO
-    /// Not yet implemented. See: <https://github.com/your-org/StarInvoice/issues/4>
     pub fn release_payment(env: Env, invoice_id: u64) -> Result<(), ContractError> {
-        let invoice = storage::get_invoice(&env, invoice_id)?;
-        
-        // Emit the event
-        events::invoice_released(&env, invoice_id, &invoice.freelancer, invoice.amount);
+        let mut invoice = storage::get_invoice(&env, invoice_id)?;
 
-        todo!("release_payment token transfer not yet implemented")
+        if !validate_transition(&invoice.status, &InvoiceStatus::Completed) {
+            return Err(ContractError::InvalidInvoiceStatus);
+        }
+
+        let token_client = token::Client::new(&env, &invoice.token);
+        token_client.transfer(&env.current_contract_address(), &invoice.freelancer, &invoice.amount);
+
+        invoice.status = InvoiceStatus::Completed;
+        storage::save_invoice(&env, &invoice);
+
+        events::release_payment(&env, invoice_id, &invoice.freelancer, invoice.amount);
+        Ok(())
     }
 
-    /// Allows either party to dispute an invoice.
-    ///
-    /// # Parameters
-    /// - `invoice_id`: ID of the invoice to dispute.
-    /// - `caller`: Address of the party raising the dispute (freelancer or client).
-    ///
-    /// # Errors
-    /// - Panics if the invoice status is not `Funded` or `Delivered`.
-    /// - Panics if `caller` is neither the freelancer nor the client.
-    pub fn dispute_invoice(env: Env, invoice_id: u64, caller: Address) -> Result<(), ContractError> {
-        caller.require_auth();
+    /// Returns the data for a specific invoice ID.
+    pub fn get_invoice(env: Env, invoice_id: u64) -> Result<Invoice, ContractError> {
+        storage::get_invoice(&env, invoice_id)
+    }
 
-        let invoice = storage::get_invoice(&env, invoice_id)?;
+    /// Returns all invoice IDs for a given freelancer.
+    pub fn get_invoices_by_freelancer(env: Env, freelancer: Address) -> soroban_sdk::Vec<u64> {
+        storage::get_invoices_by_freelancer(&env, &freelancer)
+    }
 
-        assert!(
-            invoice.status == storage::InvoiceStatus::Funded || invoice.status == storage::InvoiceStatus::Delivered,
-            "Invoice can only be disputed from Funded or Delivered status"
-        );
-
-        assert!(
-            caller == invoice.freelancer || caller == invoice.client,
-            "Only the freelancer or client can dispute the invoice"
-        );
-
-        storage::update_invoice_status(&env, invoice_id, storage::InvoiceStatus::Disputed);
-        events::invoice_disputed(&env, invoice_id, &caller);
-        Ok(())
+    /// Returns all invoice IDs for a given client.
+    pub fn get_invoices_by_client(env: Env, client: Address) -> soroban_sdk::Vec<u64> {
+        storage::get_invoices_by_client(&env, &client)
     }
 }
 
