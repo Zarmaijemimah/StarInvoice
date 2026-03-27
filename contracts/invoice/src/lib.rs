@@ -48,6 +48,7 @@ impl InvoiceContract {
         amount: i128,
         token: Address,
         deadline: u64,
+        title: String,
         description: String,
     ) -> Result<u64, ContractError> {
         freelancer.require_auth();
@@ -68,7 +69,10 @@ impl InvoiceContract {
             amount,
             token,
             deadline,
-            created_at: env.ledger().timestamp(),
+invoice
+            title,
+=======
+            created_at: env.ledger().timestamp(), main
             description,
             status: InvoiceStatus::Pending,
         };
@@ -210,7 +214,32 @@ impl InvoiceContract {
 #[cfg(test)]
 mod tests {
     use super::*;
+  invoice
+    use soroban_sdk::{testutils::{Address as _, Ledger}, Env, String};
+
+    fn setup_token(env: &Env) -> Address {
+        let admin = Address::generate(env);
+        env.register_stellar_asset_contract_v2(admin).address()
+    }
+
+    #[test]
+    #[should_panic(expected = "Client and freelancer must be different addresses")]
+    fn test_create_invoice_client_equals_freelancer() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let title = String::from_str(&env, "Self Invoice");
+        let description = String::from_str(&env, "Self-invoice");
+
+        client.create_invoice(&freelancer, &freelancer, &1000, &Address::generate(&env), &9999999999, &title, &description);
+    }
+=======
     use soroban_sdk::{testutils::Address as _, Env, String};
+ main
 
     #[test]
     fn test_create_invoice() {
@@ -222,9 +251,17 @@ mod tests {
 
         let freelancer = Address::generate(&env);
         let payer = Address::generate(&env);
+ invoice
+        let token_address = setup_token(&env);
+        let title = String::from_str(&env, "Website Redesign");
+        let description = String::from_str(&env, "Website redesign - Phase 1");
+
+        let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &token_address, &9999999999, &title, &description);
+=======
         let description = String::from_str(&env, "Website redesign - Phase 1");
 
         let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &description);
+ main
 
         assert_eq!(invoice_id, 0);
 
@@ -245,9 +282,17 @@ mod tests {
 
         let freelancer = Address::generate(&env);
         let payer = Address::generate(&env);
+ invoice
+        let token_address = setup_token(&env);
+        let title = String::from_str(&env, "Logo Design");
+        let description = String::from_str(&env, "Logo design");
+
+        let invoice_id = client.create_invoice(&freelancer, &payer, &500, &token_address, &9999999999, &title, &description);
+=======
         let description = String::from_str(&env, "Logo design");
 
         let invoice_id = client.create_invoice(&freelancer, &payer, &500, &description);
+ main
         client.cancel_invoice(&invoice_id, &freelancer);
 
         let invoice = env.as_contract(&contract_id, || storage::get_invoice(&env, invoice_id).unwrap());
@@ -264,9 +309,17 @@ mod tests {
 
         let freelancer = Address::generate(&env);
         let payer = Address::generate(&env);
+ invoice
+        let token_address = setup_token(&env);
+        let title = String::from_str(&env, "SEO Audit");
+        let description = String::from_str(&env, "SEO audit");
+
+        let invoice_id = client.create_invoice(&freelancer, &payer, &200, &token_address, &9999999999, &title, &description);
+=======
         let description = String::from_str(&env, "SEO audit");
 
         let invoice_id = client.create_invoice(&freelancer, &payer, &200, &description);
+      main
         client.cancel_invoice(&invoice_id, &payer);
 
         let invoice = env.as_contract(&contract_id, || storage::get_invoice(&env, invoice_id).unwrap());
@@ -285,9 +338,14 @@ mod tests {
         let freelancer = Address::generate(&env);
         let payer = Address::generate(&env);
         let stranger = Address::generate(&env);
+      invoice
+        let token_address = setup_token(&env);
+        let title = String::from_str(&env, "Branding Package");
+=======
+ main
         let description = String::from_str(&env, "Branding package");
 
-        let invoice_id = client.create_invoice(&freelancer, &payer, &750, &description);
+        let invoice_id = client.create_invoice(&freelancer, &payer, &750, &token_address, &9999999999, &title, &description);
         let _ = client.cancel_invoice(&invoice_id, &stranger);
     }
 
@@ -302,11 +360,19 @@ mod tests {
 
         let freelancer = Address::generate(&env);
         let payer = Address::generate(&env);
+ invoice
+        let token_address = setup_token(&env);
+        let title = String::from_str(&env, "App Development");
+        let description = String::from_str(&env, "App development");
+
+        let invoice_id = client_contract.create_invoice(&freelancer, &payer, &3000, &token_address, &9999999999, &title, &description);
+=======
         let description = String::from_str(&env, "App development");
 
         let invoice_id = client_contract.create_invoice(&freelancer, &payer, &3000, &description);
 
         // Cancel once to move it out of Pending
+ main
         client_contract.cancel_invoice(&invoice_id, &freelancer);
 
         // Attempt to cancel again — should panic
@@ -314,6 +380,44 @@ mod tests {
     }
 
     #[test]
+ invoice
+    #[should_panic(expected = "Invoice can only be cancelled from Pending status")]
+    fn test_cancel_invoice_from_funded() {
+        use soroban_sdk::testutils::Address as _;
+        use soroban_sdk::token;
+
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let description = String::from_str(&env, "Development services");
+        let amount: i128 = 1500;
+
+        // Deploy mock token
+        let token_admin = Address::generate(&env);
+        let token_id = env.register_stellar_asset_contract_v2(token_admin.clone());
+        let token_address = token_id.address();
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
+        token_admin_client.mint(&payer, &amount);
+
+        // Create invoice (Pending)
+        let title = String::from_str(&env, "Development Services");
+        let invoice_id = client.create_invoice(&freelancer, &payer, &amount, &token_address, &9999999999, &title, &description);
+
+        // Fund it to Funded status
+        client.fund_invoice(&invoice_id, &token_address);
+
+        // Try to cancel from Funded -> should panic
+        let _ = client.cancel_invoice(&invoice_id, &freelancer);
+    }
+
+    #[test]
+=======
+ main
     fn test_fund_invoice_happy_path() {
         use soroban_sdk::testutils::Address as _;
         use soroban_sdk::token;
@@ -367,6 +471,9 @@ mod tests {
             &freelancer,
             &payer,
             &1000,
+            &Address::generate(&env), // token
+            &9999999999, // deadline
+            &String::from_str(&env, "Task 1"),
             &String::from_str(&env, "Desc 1"),
         );
         assert_eq!(client.invoice_count(), 1);
@@ -375,6 +482,9 @@ mod tests {
             &freelancer,
             &payer,
             &2000,
+            &Address::generate(&env), // token
+            &9999999999, // deadline
+            &String::from_str(&env, "Task 2"),
             &String::from_str(&env, "Desc 2"),
         );
         assert_eq!(client.invoice_count(), 2);
@@ -385,6 +495,36 @@ mod tests {
         let env = Env::default();
         env.mock_all_auths();
 
+ invoice
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let title = String::from_str(&env, "Dispute Test");
+        let description = String::from_str(&env, "Dispute test pending");
+
+        let invoice_id = client.create_invoice(&freelancer, &payer, &100, &Address::generate(&env), &9999999999, &title, &description);
+        client.dispute_invoice(&invoice_id);
+    }
+
+    // Issue #80: Negative tests for wrong-caller authorization
+    #[test]
+    #[should_panic]
+    fn test_fund_invoice_wrong_caller() {
+        let env = Env::default();
+        // Do not mock all auths to test auth failure
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let title = String::from_str(&env, "Test Funding");
+        let description = String::from_str(&env, "Test funding");
+
+        let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &Address::generate(&env), &9999999999, &title, &description);
+=======
         if !validate_transition(&invoice.status, &InvoiceStatus::Completed) {
             return Err(ContractError::InvalidInvoiceStatus);
         }
@@ -394,11 +534,74 @@ mod tests {
 
         invoice.status = InvoiceStatus::Completed;
         storage::save_invoice(&env, &invoice);
+ main
 
         events::release_payment(&env, invoice_id, &invoice.freelancer, invoice.amount);
         Ok(())
     }
 
+ invoice
+    #[test]
+    #[should_panic]
+    fn test_mark_delivered_wrong_caller() {
+        let env = Env::default();
+        // Do not mock all auths
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let title = String::from_str(&env, "Test Delivery");
+        let description = String::from_str(&env, "Test delivery");
+
+        let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &Address::generate(&env), &9999999999, &title, &description);
+
+        // Fund the invoice first
+        env.mock_all_auths(); // temporarily mock to fund
+        let token_admin = Address::generate(&env);
+        let token_id = env.register_stellar_asset_contract_v2(token_admin.clone());
+        let token_address = token_id.address();
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
+        token_admin_client.mint(&payer, &1000);
+        client.fund_invoice(&invoice_id, &token_address);
+        env.set_auths(&[]); // clear mocks
+
+        // Try to mark delivered as client (wrong caller) - should panic
+        let _ = client.mark_delivered(&invoice_id);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_approve_payment_wrong_caller() {
+        let env = Env::default();
+        // Do not mock all auths
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let title = String::from_str(&env, "Test Approval");
+        let description = String::from_str(&env, "Test approval");
+
+        let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &Address::generate(&env), &9999999999, &title, &description);
+
+        // Fund and deliver the invoice first
+        env.mock_all_auths();
+        let token_admin = Address::generate(&env);
+        let token_id = env.register_stellar_asset_contract_v2(token_admin.clone());
+        let token_address = token_id.address();
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
+        token_admin_client.mint(&payer, &1000);
+        client.fund_invoice(&invoice_id, &token_address);
+        client.mark_delivered(&invoice_id);
+        env.set_auths(&[]);
+
+        // Try to approve as freelancer (wrong caller) - should panic
+        let _ = client.approve_payment(&invoice_id);
+    }
+=======
     /// Returns the data for a specific invoice ID.
     pub fn get_invoice(env: Env, invoice_id: u64) -> Result<Invoice, ContractError> {
         storage::get_invoice(&env, invoice_id)
@@ -408,6 +611,7 @@ mod tests {
     fn test_dispute_invoice_by_client() {
         use soroban_sdk::testutils::Address as _;
         use soroban_sdk::token;
+ main
 
         let env = Env::default();
         env.mock_all_auths();
@@ -417,13 +621,64 @@ mod tests {
 
         let freelancer = Address::generate(&env);
         let payer = Address::generate(&env);
+ invoice
+        let title = String::from_str(&env, "Test Double Funding");
+        let description = String::from_str(&env, "Test double funding");
+
+        let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &Address::generate(&env), &9999999999, &title, &description);
+=======
         let description = String::from_str(&env, "Dispute case");
         let amount: i128 = 2000;
+ main
 
         let token_admin = Address::generate(&env);
         let token_id = env.register_stellar_asset_contract_v2(token_admin.clone());
         let token_address = token_id.address();
         let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
+ invoice
+        token_admin_client.mint(&payer, &2000); // mint extra
+
+        client.fund_invoice(&invoice_id, &token_address);
+        // Try to fund again - should panic
+        let _ = client.fund_invoice(&invoice_id, &token_address);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invoice must be in Funded status")]
+    fn test_mark_delivered_pending_invoice() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let title = String::from_str(&env, "Test Mark Delivered");
+        let description = String::from_str(&env, "Test mark delivered on pending");
+
+        let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &Address::generate(&env), &9999999999, &title, &description);
+
+        // Try to mark delivered on pending - should panic
+        let _ = client.mark_delivered(&invoice_id);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invoice must be in Delivered status")]
+    fn test_approve_payment_funded_invoice() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let title = String::from_str(&env, "Test Approve on Funded");
+        let description = String::from_str(&env, "Test approve on funded");
+
+        let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &Address::generate(&env), &9999999999, &title, &description);
+=======
         token_admin_client.mint(&payer, &amount);
 
         let invoice_id = invoice_client.create_invoice(&freelancer, &payer, &amount, &description);
@@ -431,15 +686,45 @@ mod tests {
 
         // Dispute from Funded status
         invoice_client.dispute_invoice(&invoice_id, &payer);
+ main
 
         let invoice = invoice_client.get_invoice(&invoice_id);
         assert_eq!(invoice.status, storage::InvoiceStatus::Disputed);
     }
 
     #[test]
+ invoice
+    #[should_panic(expected = "Invoice must be in Approved status")]
+    fn test_release_payment_delivered_invoice() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let title = String::from_str(&env, "Test Release on Delivered");
+        let description = String::from_str(&env, "Test release on delivered");
+
+        let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &Address::generate(&env), &9999999999, &title, &description);
+
+        let token_admin = Address::generate(&env);
+        let token_id = env.register_stellar_asset_contract_v2(token_admin.clone());
+        let token_address = token_id.address();
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
+        token_admin_client.mint(&payer, &1000);
+        client.fund_invoice(&invoice_id, &token_address);
+        client.mark_delivered(&invoice_id);
+
+        // Try to release on delivered (not approved) - should panic
+        let _ = client.release_payment(&invoice_id, &token_address);
+    }
+=======
     #[should_panic(expected = "Invoice can only be disputed from")]
     fn test_dispute_invoice_invalid_status() {
         use soroban_sdk::testutils::Address as _;
+ main
 
         let env = Env::default();
         env.mock_all_auths();
@@ -451,9 +736,87 @@ mod tests {
         let payer = Address::generate(&env);
         let description = String::from_str(&env, "Status dispute");
 
+ invoice
+        // Deploy token and mint to payer
+        let token_admin = Address::generate(&env);
+        let token_id = env.register_stellar_asset_contract_v2(token_admin.clone());
+        let token_address = token_id.address();
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
+        token_admin_client.mint(&payer, &amount);
+
+        let token_client = token::Client::new(&env, &token_address);
+
+        // Step 1: Create invoice
+        let title = String::from_str(&env, "Full Escrow Flow");
+        let invoice_id = client.create_invoice(&freelancer, &payer, &amount, &token_address, &9999999999, &title, &description);
+        let invoice = env.as_contract(&contract_id, || storage::get_invoice(&env, invoice_id).unwrap());
+        assert_eq!(invoice.status, storage::InvoiceStatus::Pending);
+
+        // Step 2: Fund invoice
+        client.fund_invoice(&invoice_id, &token_address);
+        let invoice = env.as_contract(&contract_id, || storage::get_invoice(&env, invoice_id).unwrap());
+        assert_eq!(invoice.status, storage::InvoiceStatus::Funded);
+        assert_eq!(token_client.balance(&contract_id), amount);
+        assert_eq!(token_client.balance(&payer), 0);
+
+        // Step 3: Mark delivered
+        client.mark_delivered(&invoice_id);
+        let invoice = env.as_contract(&contract_id, || storage::get_invoice(&env, invoice_id).unwrap());
+        assert_eq!(invoice.status, storage::InvoiceStatus::Delivered);
+
+        // Step 4: Approve payment
+        client.approve_payment(&invoice_id);
+        let invoice = env.as_contract(&contract_id, || storage::get_invoice(&env, invoice_id).unwrap());
+        assert_eq!(invoice.status, storage::InvoiceStatus::Approved);
+
+        // Step 5: Release payment
+        client.release_payment(&invoice_id, &token_address);
+        let invoice = env.as_contract(&contract_id, || storage::get_invoice(&env, invoice_id).unwrap());
+        assert_eq!(invoice.status, storage::InvoiceStatus::Completed);
+
+        // Assert final balances
+        assert_eq!(token_client.balance(&contract_id), 0);
+        assert_eq!(token_client.balance(&freelancer), amount);
+        assert_eq!(token_client.balance(&payer), 0);
+    }
+
+    // Issue #83: Test for create_invoice with duplicate IDs (regression)
+    #[test]
+    fn test_create_invoice_unique_ids() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client = InvoiceContractClient::new(&env, &contract_id);
+
+        let freelancer = Address::generate(&env);
+        let payer = Address::generate(&env);
+        let title = String::from_str(&env, "Unique ID Test");
+        let description = String::from_str(&env, "Unique ID test");
+
+        let mut ids: soroban_sdk::Vec<u64> = soroban_sdk::Vec::new(&env);
+
+        for i in 0..10u64 {
+            let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &Address::generate(&env), &9999999999, &title, &description);
+            assert_eq!(invoice_id, i);
+            // Check not already in ids
+            let mut is_unique = true;
+            for existing_id in ids.iter() {
+                if existing_id == invoice_id {
+                    is_unique = false;
+                    break;
+                }
+            }
+            assert!(is_unique, "Duplicate ID found: {}", invoice_id);
+            ids.push_back(invoice_id);
+        }
+
+        assert_eq!(client.invoice_count(), 10);
+=======
         let invoice_id = invoice_client.create_invoice(&freelancer, &payer, &100, &description);
 
         // It is Pending here, not Funded/Delivered.
         let _ = invoice_client.dispute_invoice(&invoice_id, &freelancer);
+ main
     }
 }

@@ -49,6 +49,8 @@ pub struct Invoice {
     pub client: Address,
     /// Payment amount in the smallest token unit (stroops).
     pub amount: i128,
+    /// Short human-readable title for the invoice.
+    pub title: String,
     /// Human-readable description of the work to be performed.
     pub description: String,
     /// Address of the token contract used for payment.
