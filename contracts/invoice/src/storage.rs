@@ -1,5 +1,5 @@
 use soroban_sdk::{contracterror, contracttype, Address, Env, String};
-use crate::constants::{TTL_THRESHOLD, TTL_EXTEND_TO};
+use crate::constants::{TTL_THRESHOLD, TTL_EXTEND_TO, MAX_DESCRIPTION_LEN};
 
 /// Contract-level errors returned by state-changing functions.
 #[contracterror]
@@ -11,6 +11,8 @@ pub enum ContractError {
     InvalidInvoiceStatus = 2,
     /// The caller is not authorised to perform this operation.
     UnauthorizedCaller = 3,
+    /// The description exceeds the maximum allowed length.
+    DescriptionTooLong = 4,
 }
 
 /// Represents the lifecycle state of an invoice.
