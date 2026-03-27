@@ -39,6 +39,7 @@ This project uses `rustfmt.toml` to enforce consistent formatting. All code must
 cargo fmt        # format (must pass before committing)
 cargo clippy     # lint
 cargo test       # test
+cargo audit      # check dependencies for vulnerabilities
 ```
 
 Ensure `cargo fmt` passes on all changes before opening a PR.
