@@ -50,6 +50,14 @@ pub fn invoice_funded(env: &Env, invoice_id: u64, client: &Address) {
     );
 }
 
+/// Emits an event when a freelancer marks work as delivered.
+///
+/// Topic: `("INVOICE", "delivered")`
+/// Data:  `(invoice_id, freelancer)`
+/// Emits an event when a freelancer marks work as delivered.
+///
+/// Topic: `("INVOICE", "delivered")`
+/// Data:  `(invoice_id, freelancer)`
 pub fn mark_delivered(env: &Env, invoice_id: u64, freelancer: &Address) {
     env.events().publish(
         (symbol_short!("INVOICE"), symbol_short!("delivered")),
@@ -57,7 +65,13 @@ pub fn mark_delivered(env: &Env, invoice_id: u64, freelancer: &Address) {
     );
 }
 
-// TODO: Add event emitters for each state transition:
-// - mark_delivered  -> emit "INVOICE delivered" | data: (invoice_id, freelancer)
-// - release_payment -> emit "INVOICE released"  | data: (invoice_id, amount)
-// See: https://github.com/your-org/StarInvoice/issues/7
+/// Emits an event when escrowed funds are released to the freelancer.
+///
+/// Topic: `("INVOICE", "released")`
+/// Data:  `(invoice_id, freelancer, amount)`
+pub fn release_payment(env: &Env, invoice_id: u64, freelancer: &Address, amount: i128) {
+    env.events().publish(
+        (symbol_short!("INVOICE"), symbol_short!("released")),
+        (invoice_id, freelancer.clone(), amount),
+    );
+}
