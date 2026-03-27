@@ -37,6 +37,7 @@ Each TODO in the codebase maps to a GitHub issue:
 cargo fmt        # format
 cargo clippy     # lint
 cargo test       # test
+cargo audit      # check dependencies for vulnerabilities
 ```
 
 ## Pull Request Process
