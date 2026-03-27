@@ -105,7 +105,7 @@
                   }
                 },
                 {
-                  "string": "Test approval"
+                  "string": "Test delivery"
                 }
               ]
             }
@@ -236,7 +236,7 @@
                       }
                     },
                     {
-                      "string": "Test approval"
+                      "string": "Test delivery"
                     }
                   ]
                 }
