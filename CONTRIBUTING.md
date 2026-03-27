@@ -33,23 +33,15 @@ Each TODO in the codebase maps to a GitHub issue:
 
 ## Code Style
 
-Use the Makefile for common development tasks:
+This project uses `rustfmt.toml` to enforce consistent formatting. All code must pass formatting checks before merging.
 
 ```bash
-make build       # compile to wasm32-unknown-unknown --release
-make test        # run all tests
-make fmt         # format code
-make lint        # run clippy with strict warnings
-make clean       # remove build artifacts
-```
-
-Or use cargo directly:
-
-```bash
-cargo fmt        # format
+cargo fmt        # format (must pass before committing)
 cargo clippy     # lint
 cargo test       # test
 ```
+
+Ensure `cargo fmt` passes on all changes before opening a PR.
 
 ## Pull Request Process
 
