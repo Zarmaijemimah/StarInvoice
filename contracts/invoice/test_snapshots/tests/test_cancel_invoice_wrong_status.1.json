@@ -541,7 +541,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "caught panic 'Invoice can only be cancelled from Pending status' from contract function 'Symbol(obj#83)'"
+                  "string": "caught panic 'Invoice can only be cancelled from Pending status' from contract function 'Symbol(obj#99)'"
                 },
                 {
                   "u64": 0

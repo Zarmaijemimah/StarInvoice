@@ -61,7 +61,7 @@ impl InvoiceContract {
     /// - Panics if the caller is not the invoice client.
     /// - Panics if the invoice status is not `Pending`.
     pub fn fund_invoice(env: Env, invoice_id: u64, token_address: Address) -> Result<(), ContractError> {
-        let mut invoice = storage::get_invoice(&env, invoice_id)?;
+        let invoice = storage::get_invoice(&env, invoice_id)?;
 
         invoice.client.require_auth();
 
@@ -73,8 +73,7 @@ impl InvoiceContract {
         let token = token::Client::new(&env, &token_address);
         token.transfer(&invoice.client, &env.current_contract_address(), &invoice.amount);
 
-        invoice.status = storage::InvoiceStatus::Funded;
-        storage::save_invoice(&env, &invoice);
+        storage::update_invoice_status(&env, invoice_id, storage::InvoiceStatus::Funded);
 
         events::invoice_funded(&env, invoice_id, &invoice.client);
         Ok(())
@@ -89,7 +88,7 @@ impl InvoiceContract {
     /// - Panics if the caller is not the invoice freelancer.
     /// - Panics if the invoice status is not `Funded`.
     pub fn mark_delivered(env: Env, invoice_id: u64) -> Result<(), ContractError> {
-        let mut invoice = storage::get_invoice(&env, invoice_id)?;
+        let invoice = storage::get_invoice(&env, invoice_id)?;
 
         invoice.freelancer.require_auth();
 
@@ -98,8 +97,7 @@ impl InvoiceContract {
             "Invoice must be in Funded status"
         );
 
-        invoice.status = storage::InvoiceStatus::Delivered;
-        storage::save_invoice(&env, &invoice);
+        storage::update_invoice_status(&env, invoice_id, storage::InvoiceStatus::Delivered);
 
         events::mark_delivered(&env, invoice_id, &invoice.freelancer);
         Ok(())
@@ -117,7 +115,7 @@ impl InvoiceContract {
     /// # TODO
     /// Not yet implemented. See: <https://github.com/your-org/StarInvoice/issues/3>
     pub fn approve_payment(env: Env, invoice_id: u64) -> Result<(), ContractError> {
-        let mut invoice = storage::get_invoice(&env, invoice_id)?;
+        let invoice = storage::get_invoice(&env, invoice_id)?;
 
         invoice.client.require_auth();
 
@@ -126,8 +124,7 @@ impl InvoiceContract {
             "Invoice must be in Delivered status"
         );
 
-        invoice.status = storage::InvoiceStatus::Approved;
-        storage::save_invoice(&env, &invoice);
+        storage::update_invoice_status(&env, invoice_id, storage::InvoiceStatus::Approved);
 
         events::approve_payment(&env, invoice_id, &invoice.client);
         Ok(())
@@ -155,7 +152,7 @@ impl InvoiceContract {
     pub fn cancel_invoice(env: Env, invoice_id: u64, caller: Address) -> Result<(), ContractError> {
         caller.require_auth();
 
-        let mut invoice = storage::get_invoice(&env, invoice_id)?;
+        let invoice = storage::get_invoice(&env, invoice_id)?;
 
         assert!(
             invoice.status == storage::InvoiceStatus::Pending,
@@ -167,8 +164,7 @@ impl InvoiceContract {
             "Only the freelancer or client can cancel the invoice"
         );
 
-        invoice.status = storage::InvoiceStatus::Cancelled;
-        storage::save_invoice(&env, &invoice);
+        storage::update_invoice_status(&env, invoice_id, storage::InvoiceStatus::Cancelled);
         events::invoice_cancelled(&env, invoice_id, &caller);
         Ok(())
     }
@@ -204,7 +200,7 @@ impl InvoiceContract {
     pub fn dispute_invoice(env: Env, invoice_id: u64, caller: Address) -> Result<(), ContractError> {
         caller.require_auth();
 
-        let mut invoice = storage::get_invoice(&env, invoice_id)?;
+        let invoice = storage::get_invoice(&env, invoice_id)?;
 
         assert!(
             invoice.status == storage::InvoiceStatus::Funded || invoice.status == storage::InvoiceStatus::Delivered,
@@ -216,8 +212,7 @@ impl InvoiceContract {
             "Only the freelancer or client can dispute the invoice"
         );
 
-        invoice.status = storage::InvoiceStatus::Disputed;
-        storage::save_invoice(&env, &invoice);
+        storage::update_invoice_status(&env, invoice_id, storage::InvoiceStatus::Disputed);
         events::invoice_disputed(&env, invoice_id, &caller);
         Ok(())
     }
