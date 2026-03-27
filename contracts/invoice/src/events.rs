@@ -17,6 +17,39 @@ pub fn invoice_created(
     );
 }
 
+/// Emits an event when an invoice is funded by the client.
+///
+/// Topic: `("INVOICE", "funded")`
+/// Data:  `(invoice_id, client, amount)`
+pub fn invoice_funded(env: &Env, invoice_id: u64, client: &Address, amount: i128) {
+    env.events().publish(
+        (symbol_short!("INVOICE"), symbol_short!("funded")),
+        (invoice_id, client.clone(), amount),
+    );
+}
+
+/// Emits an event when a freelancer marks work as delivered.
+///
+/// Topic: `("INVOICE", "delivered")`
+/// Data:  `(invoice_id, freelancer)`
+pub fn mark_delivered(env: &Env, invoice_id: u64, freelancer: &Address) {
+    env.events().publish(
+        (symbol_short!("INVOICE"), symbol_short!("delivered")),
+        (invoice_id, freelancer.clone()),
+    );
+}
+
+/// Emits an event when a client approves payment for a delivered invoice.
+///
+/// Topic: `("INVOICE", "approved")`
+/// Data:  `(invoice_id, client)`
+pub fn invoice_approved(env: &Env, invoice_id: u64, client: &Address) {
+    env.events().publish(
+        (symbol_short!("INVOICE"), symbol_short!("approved")),
+        (invoice_id, client.clone()),
+    );
+}
+
 /// Emits an event when an invoice is cancelled.
 ///
 /// Topic: `("INVOICE", "cancelled")`
@@ -28,32 +61,14 @@ pub fn invoice_cancelled(env: &Env, invoice_id: u64, cancelled_by: &Address) {
     );
 }
 
-/// Emits an event when a client approves payment for a delivered invoice.
+/// Emits an event when escrowed funds are released to the freelancer.
 ///
-/// Topic: `("INVOICE", "approved")`
-/// Data:  `(invoice_id, client)`
-pub fn approve_payment(env: &Env, invoice_id: u64, client: &Address) {
+/// Topic: `("INVOICE", "released")`
+/// Data:  `(invoice_id, freelancer, amount)`
+pub fn release_payment(env: &Env, invoice_id: u64, freelancer: &Address, amount: i128) {
     env.events().publish(
-        (symbol_short!("INVOICE"), symbol_short!("approved")),
-        (invoice_id, client.clone()),
-    );
-}
-
-/// Emits an event when an invoice is funded by the client.
-///
-/// Topic: `("INVOICE", "funded")`
-/// Data:  `(invoice_id, client)`
-pub fn invoice_funded(env: &Env, invoice_id: u64, client: &Address) {
-    env.events().publish(
-        (symbol_short!("INVOICE"), symbol_short!("funded")),
-        (invoice_id, client.clone()),
-    );
-}
-
-pub fn mark_delivered(env: &Env, invoice_id: u64, freelancer: &Address) {
-    env.events().publish(
-        (symbol_short!("INVOICE"), symbol_short!("delivered")),
-        (invoice_id, freelancer.clone()),
+        (symbol_short!("INVOICE"), symbol_short!("released")),
+        (invoice_id, freelancer.clone(), amount),
     );
 }
 
