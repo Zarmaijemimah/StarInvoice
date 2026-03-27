@@ -51,6 +51,9 @@ impl InvoiceContract {
         title: String,
         description: String,
     ) -> Result<u64, ContractError> {
+        // NOTE: Soroban's Address type is guaranteed to be valid by the SDK and cannot be
+        // zero or null in practice. The SDK enforces address validation at deserialization,
+        // so no additional zero-address checks are required.
         freelancer.require_auth();
 
         assert!(amount > 0, "Invoice amount must be greater than zero");
