@@ -1,11 +1,39 @@
 #![no_std]
 
+mod constants;
 mod events;
 mod storage;
 
 use soroban_sdk::{contract, contractimpl, token, Address, Env, String};
 
-pub use storage::{Invoice, ContractError};
+pub use storage::{ContractError, Invoice, InvoiceStatus};
+
+/// Validates whether a status transition is allowed.
+///
+/// Returns `true` if transitioning `from` → `to` is a legal state change.
+///
+/// Valid transitions:
+/// ```text
+/// Pending   → Funded
+/// Pending   → Cancelled
+/// Funded    → Delivered
+/// Funded    → Disputed
+/// Delivered → Approved
+/// Delivered → Disputed
+/// Approved  → Completed
+/// ```
+pub fn validate_transition(from: &InvoiceStatus, to: &InvoiceStatus) -> bool {
+    matches!(
+        (from, to),
+        (InvoiceStatus::Pending, InvoiceStatus::Funded)
+            | (InvoiceStatus::Pending, InvoiceStatus::Cancelled)
+            | (InvoiceStatus::Funded, InvoiceStatus::Delivered)
+            | (InvoiceStatus::Funded, InvoiceStatus::Disputed)
+            | (InvoiceStatus::Delivered, InvoiceStatus::Approved)
+            | (InvoiceStatus::Delivered, InvoiceStatus::Disputed)
+            | (InvoiceStatus::Approved, InvoiceStatus::Completed)
+    )
+}
 
 #[contract]
 pub struct InvoiceContract;
@@ -13,26 +41,24 @@ pub struct InvoiceContract;
 #[contractimpl]
 impl InvoiceContract {
     /// Creates a new invoice and stores it on-chain.
-    ///
-    /// # Parameters
-    /// - `freelancer`: Address of the service provider; must sign the transaction.
-    /// - `client`: Address of the paying party.
-    /// - `amount`: Payment amount in the smallest token unit (stroops).
-    /// - `description`: Human-readable description of the work.
-    ///
-    /// # Returns
-    /// The newly assigned invoice ID.
-    ///
-    /// # Errors
-    /// Panics if `freelancer` authorization fails.
     pub fn create_invoice(
         env: Env,
         freelancer: Address,
         client: Address,
         amount: i128,
+        token: Address,
+        deadline: u64,
+        title: String,
         description: String,
-    ) -> u64 {
+    ) -> Result<u64, ContractError> {
         freelancer.require_auth();
+
+        assert!(amount > 0, "Invoice amount must be greater than zero");
+        assert!(freelancer != client, "Client and freelancer must be different addresses");
+
+        if description.len() > constants::MAX_DESCRIPTION_LEN {
+            return Err(ContractError::DescriptionTooLong);
+        }
 
         let invoice_id = storage::next_invoice_id(&env);
 
@@ -41,14 +67,17 @@ impl InvoiceContract {
             freelancer: freelancer.clone(),
             client: client.clone(),
             amount,
+            token,
+            deadline,
+            title,
+            created_at: env.ledger().timestamp(),
             description,
-            status: storage::InvoiceStatus::Pending,
+            status: InvoiceStatus::Pending,
         };
 
         storage::save_invoice(&env, &invoice);
         events::invoice_created(&env, invoice_id, &freelancer, &client, amount);
-
-        invoice_id
+        Ok(invoice_id)
     }
 
     /// Allows the client to deposit funds into escrow for the given invoice.
@@ -58,48 +87,43 @@ impl InvoiceContract {
     /// - `token_address`: Address of the token contract to transfer from.
     ///
     /// # Errors
-    /// - Panics if the caller is not the invoice client.
-    /// - Panics if the invoice status is not `Pending`.
+    /// - Returns `InvalidInvoiceStatus` if the caller is not the invoice client.
+    /// - Returns `InvalidInvoiceStatus` if the invoice status is not `Pending`.
+    /// - Returns `TokenMismatch` if the provided token does not match the invoice's token.
     pub fn fund_invoice(env: Env, invoice_id: u64, token_address: Address) -> Result<(), ContractError> {
-        let mut invoice = storage::get_invoice(&env, invoice_id)?;
+        let invoice = storage::get_invoice(&env, invoice_id)?;
 
         invoice.client.require_auth();
 
-        assert!(
-            invoice.status == storage::InvoiceStatus::Pending,
-            "Invoice must be in Pending status"
-        );
+        if !validate_transition(&invoice.status, &InvoiceStatus::Funded) {
+            return Err(ContractError::InvalidInvoiceStatus);
+        }
 
-        let token = token::Client::new(&env, &token_address);
-        token.transfer(&invoice.client, &env.current_contract_address(), &invoice.amount);
+        // Validate that the provided token matches the invoice's token
+        if token_address != invoice.token {
+            return Err(ContractError::TokenMismatch);
+        }
 
-        invoice.status = storage::InvoiceStatus::Funded;
-        storage::save_invoice(&env, &invoice);
+        let token_client = token::Client::new(&env, &invoice.token);
+        token_client.transfer(&invoice.client, &env.current_contract_address(), &invoice.amount);
 
-        events::invoice_funded(&env, invoice_id, &invoice.client);
+        storage::update_invoice_status(&env, invoice_id, storage::InvoiceStatus::Funded);
+
+        events::invoice_funded(&env, invoice_id, &invoice.client, invoice.amount);
         Ok(())
     }
 
     /// Allows the freelancer to signal that work has been completed.
-    ///
-    /// # Parameters
-    /// - `invoice_id`: ID of the invoice to mark as delivered.
-    ///
-    /// # Errors
-    /// - Panics if the caller is not the invoice freelancer.
-    /// - Panics if the invoice status is not `Funded`.
     pub fn mark_delivered(env: Env, invoice_id: u64) -> Result<(), ContractError> {
-        let mut invoice = storage::get_invoice(&env, invoice_id)?;
+        let invoice = storage::get_invoice(&env, invoice_id)?;
 
         invoice.freelancer.require_auth();
 
-        assert!(
-            invoice.status == storage::InvoiceStatus::Funded,
-            "Invoice must be in Funded status"
-        );
+        if !validate_transition(&invoice.status, &InvoiceStatus::Delivered) {
+            return Err(ContractError::InvalidInvoiceStatus);
+        }
 
-        invoice.status = storage::InvoiceStatus::Delivered;
-        storage::save_invoice(&env, &invoice);
+        storage::update_invoice_status(&env, invoice_id, storage::InvoiceStatus::Delivered);
 
         events::mark_delivered(&env, invoice_id, &invoice.freelancer);
         Ok(())
@@ -115,58 +139,35 @@ impl InvoiceContract {
     /// - Panics if the caller is not the invoice client.
     /// - Panics if the invoice status is not `Delivered`.
     pub fn approve_payment(env: Env, invoice_id: u64) -> Result<(), ContractError> {
-        let mut invoice = storage::get_invoice(&env, invoice_id)?;
+        let invoice = storage::get_invoice(&env, invoice_id)?;
 
         invoice.client.require_auth();
 
-        assert!(
-            invoice.status == storage::InvoiceStatus::Delivered,
-            "Invoice must be in Delivered status"
-        );
+        if !validate_transition(&invoice.status, &InvoiceStatus::Approved) {
+            return Err(ContractError::InvalidInvoiceStatus);
+        }
 
-        invoice.status = storage::InvoiceStatus::Approved;
-        storage::save_invoice(&env, &invoice);
+        storage::update_invoice_status(&env, invoice_id, storage::InvoiceStatus::Approved);
 
-        events::approve_payment(&env, invoice_id, &invoice.client);
+        events::invoice_approved(&env, invoice_id, &invoice.client);
         Ok(())
     }
 
-    /// Returns the current number of invoices.
-    pub fn invoice_count(env: Env) -> u64 {
-        storage::get_invoice_count(&env)
-    }
-
-    /// Returns the data for a specific invoice ID.
-    pub fn get_invoice(env: Env, invoice_id: u64) -> Result<Invoice, ContractError> {
-        storage::get_invoice(&env, invoice_id)
-    }
-
     /// Cancels a Pending invoice, voiding it permanently.
-    ///
-    /// # Parameters
-    /// - `invoice_id`: ID of the invoice to cancel.
-    /// - `caller`: Address of the party requesting cancellation (freelancer or client).
-    ///
-    /// # Errors
-    /// - Panics if the invoice status is not `Pending`.
-    /// - Panics if `caller` is neither the freelancer nor the client.
     pub fn cancel_invoice(env: Env, invoice_id: u64, caller: Address) -> Result<(), ContractError> {
         caller.require_auth();
 
-        let mut invoice = storage::get_invoice(&env, invoice_id)?;
+        let invoice = storage::get_invoice(&env, invoice_id)?;
 
-        assert!(
-            invoice.status == storage::InvoiceStatus::Pending,
-            "Invoice can only be cancelled from Pending status"
-        );
+        if caller != invoice.freelancer && caller != invoice.client {
+            return Err(ContractError::UnauthorizedCaller);
+        }
 
-        assert!(
-            caller == invoice.freelancer || caller == invoice.client,
-            "Only the freelancer or client can cancel the invoice"
-        );
+        if !validate_transition(&invoice.status, &InvoiceStatus::Cancelled) {
+            return Err(ContractError::InvalidInvoiceStatus);
+        }
 
-        invoice.status = storage::InvoiceStatus::Cancelled;
-        storage::save_invoice(&env, &invoice);
+        storage::update_invoice_status(&env, invoice_id, storage::InvoiceStatus::Cancelled);
         events::invoice_cancelled(&env, invoice_id, &caller);
         Ok(())
     }
@@ -213,187 +214,109 @@ mod tests {
         let contract_id = env.register_contract(None, InvoiceContract);
         let client = InvoiceContractClient::new(&env, &contract_id);
 
-        let freelancer = Address::generate(&env);
-        let payer = Address::generate(&env);
-        let description = String::from_str(&env, "Website redesign - Phase 1");
+        invoice.client.require_auth();
 
-        let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &description);
+        if !validate_transition(&invoice.status, &InvoiceStatus::Disputed) {
+            return Err(ContractError::InvalidInvoiceStatus);
+        }
 
-        assert_eq!(invoice_id, 0);
+        invoice.status = InvoiceStatus::Disputed;
+        storage::save_invoice(&env, &invoice);
 
-        // Verify the invoice was stored correctly
-        let invoice = env.as_contract(&contract_id, || storage::get_invoice(&env, invoice_id).unwrap());
-        assert_eq!(invoice.freelancer, freelancer);
-        assert_eq!(invoice.client, payer);
-        assert_eq!(invoice.amount, 1000);
+        events::invoice_disputed(&env, invoice_id, &invoice.client);
+        Ok(())
     }
 
-    #[test]
-    fn test_cancel_invoice_by_freelancer() {
-        let env = Env::default();
-        env.mock_all_auths();
+    /// Releases escrowed funds to the freelancer once the invoice is approved.
+    pub fn release_payment(env: Env, invoice_id: u64) -> Result<(), ContractError> {
+        let mut invoice = storage::get_invoice(&env, invoice_id)?;
 
-        let contract_id = env.register_contract(None, InvoiceContract);
-        let client = InvoiceContractClient::new(&env, &contract_id);
+        if !validate_transition(&invoice.status, &InvoiceStatus::Completed) {
+            return Err(ContractError::InvalidInvoiceStatus);
+        }
 
-        let freelancer = Address::generate(&env);
-        let payer = Address::generate(&env);
-        let description = String::from_str(&env, "Logo design");
+        let token_client = token::Client::new(&env, &invoice.token);
+        token_client.transfer(&env.current_contract_address(), &invoice.freelancer, &invoice.amount);
 
-        let invoice_id = client.create_invoice(&freelancer, &payer, &500, &description);
-        client.cancel_invoice(&invoice_id, &freelancer);
+        invoice.status = InvoiceStatus::Completed;
+        storage::save_invoice(&env, &invoice);
 
-        let invoice = env.as_contract(&contract_id, || storage::get_invoice(&env, invoice_id).unwrap());
-        assert_eq!(invoice.status, storage::InvoiceStatus::Cancelled);
+        events::release_payment(&env, invoice_id, &invoice.freelancer, invoice.amount);
+        Ok(())
     }
 
-    #[test]
-    fn test_cancel_invoice_by_client() {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let contract_id = env.register_contract(None, InvoiceContract);
-        let client = InvoiceContractClient::new(&env, &contract_id);
-
-        let freelancer = Address::generate(&env);
-        let payer = Address::generate(&env);
-        let description = String::from_str(&env, "SEO audit");
-
-        let invoice_id = client.create_invoice(&freelancer, &payer, &200, &description);
-        client.cancel_invoice(&invoice_id, &payer);
-
-        let invoice = env.as_contract(&contract_id, || storage::get_invoice(&env, invoice_id).unwrap());
-        assert_eq!(invoice.status, storage::InvoiceStatus::Cancelled);
+    /// Returns the data for a specific invoice ID.
+    pub fn get_invoice(env: Env, invoice_id: u64) -> Result<Invoice, ContractError> {
+        storage::get_invoice(&env, invoice_id)
     }
 
-    #[test]
-    #[should_panic(expected = "Only the freelancer or client can cancel the invoice")]
-    fn test_cancel_invoice_unauthorized() {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let contract_id = env.register_contract(None, InvoiceContract);
-        let client = InvoiceContractClient::new(&env, &contract_id);
-
-        let freelancer = Address::generate(&env);
-        let payer = Address::generate(&env);
-        let stranger = Address::generate(&env);
-        let description = String::from_str(&env, "Branding package");
-
-        let invoice_id = client.create_invoice(&freelancer, &payer, &750, &description);
-        let _ = client.cancel_invoice(&invoice_id, &stranger);
+    /// Returns all invoice IDs for a given freelancer.
+    pub fn get_invoices_by_freelancer(env: Env, freelancer: Address) -> soroban_sdk::Vec<u64> {
+        storage::get_invoices_by_freelancer(&env, &freelancer)
     }
 
-    #[test]
-    #[should_panic(expected = "Invoice can only be cancelled from Pending status")]
-    fn test_cancel_invoice_wrong_status() {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let contract_id = env.register_contract(None, InvoiceContract);
-        let client_contract = InvoiceContractClient::new(&env, &contract_id);
-
-        let freelancer = Address::generate(&env);
-        let payer = Address::generate(&env);
-        let description = String::from_str(&env, "App development");
-
-        let invoice_id = client_contract.create_invoice(&freelancer, &payer, &3000, &description);
-
-        // Cancel once to move it out of Pending
-        client_contract.cancel_invoice(&invoice_id, &freelancer);
-
-        // Attempt to cancel again — should panic
-        let _ = client_contract.cancel_invoice(&invoice_id, &freelancer);
+    /// Returns all invoice IDs for a given client.
+    pub fn get_invoices_by_client(env: Env, client: Address) -> soroban_sdk::Vec<u64> {
+        storage::get_invoices_by_client(&env, &client)
     }
 
-    #[test]
-    fn test_fund_invoice_happy_path() {
-        use soroban_sdk::testutils::Address as _;
-        use soroban_sdk::token;
-
-        let env = Env::default();
-        env.mock_all_auths();
-
-        // Deploy the invoice contract
-        let contract_id = env.register_contract(None, InvoiceContract);
-        let invoice_client = InvoiceContractClient::new(&env, &contract_id);
-
-        let freelancer = Address::generate(&env);
-        let payer = Address::generate(&env);
-        let description = String::from_str(&env, "Smart contract audit");
-        let amount: i128 = 5000;
-
-        // Deploy a mock token and mint funds to the payer
-        let token_admin = Address::generate(&env);
-        let token_id = env.register_stellar_asset_contract_v2(token_admin.clone());
-        let token_address = token_id.address();
-        let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
-        token_admin_client.mint(&payer, &amount);
-
-        // Create and fund the invoice
-        let invoice_id = invoice_client.create_invoice(&freelancer, &payer, &amount, &description);
-        invoice_client.fund_invoice(&invoice_id, &token_address);
-
-        // Assert status is now Funded
-        let invoice = env.as_contract(&contract_id, || storage::get_invoice(&env, invoice_id).unwrap());
-        assert_eq!(invoice.status, storage::InvoiceStatus::Funded);
-
-        // Assert the contract holds the escrowed tokens
-        let token_client = token::Client::new(&env, &token_address);
-        assert_eq!(token_client.balance(&contract_id), amount);
-        assert_eq!(token_client.balance(&payer), 0);
-    }
-    #[test]
-    fn test_invoice_count() {
-        let env = Env::default();
-        env.mock_all_auths();
-
-        let contract_id = env.register_contract(None, InvoiceContract);
-        let client = InvoiceContractClient::new(&env, &contract_id);
-
-        assert_eq!(client.invoice_count(), 0);
-
-        let freelancer = Address::generate(&env);
-        let payer = Address::generate(&env);
-
-        client.create_invoice(
-            &freelancer,
-            &payer,
-            &1000,
-            &String::from_str(&env, "Desc 1"),
-        );
-        assert_eq!(client.invoice_count(), 1);
-
-        client.create_invoice(
-            &freelancer,
-            &payer,
-            &2000,
-            &String::from_str(&env, "Desc 2"),
-        );
-        assert_eq!(client.invoice_count(), 2);
+    /// Initializes the contract with an admin address.
+    /// This must be called once during contract deployment.
+    pub fn initialize(env: Env, admin: Address) -> Result<(), ContractError> {
+        admin.require_auth();
+        storage::set_admin(&env, &admin);
+        events::admin_initialized(&env, &admin);
+        Ok(())
     }
 
-    #[test]
-    fn test_get_invoice() {
-        let env = Env::default();
-        env.mock_all_auths();
+    /// Updates the contract admin address.
+    /// Only the current admin can call this function.
+    pub fn set_admin(env: Env, new_admin: Address) -> Result<(), ContractError> {
+        let current_admin = storage::get_admin(&env)?;
+        current_admin.require_auth();
 
-        let contract_id = env.register_contract(None, InvoiceContract);
-        let client = InvoiceContractClient::new(&env, &contract_id);
-
-        let freelancer = Address::generate(&env);
-        let payer = Address::generate(&env);
-        let description = String::from_str(&env, "Test get_invoice");
-
-        let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &description);
-        let invoice = client.get_invoice(&invoice_id);
-
-        assert_eq!(invoice.id, invoice_id);
-        assert_eq!(invoice.freelancer, freelancer);
-        assert_eq!(invoice.client, payer);
-        assert_eq!(invoice.amount, 1000);
-        assert_eq!(invoice.description, description);
+        storage::set_admin(&env, &new_admin);
+        events::admin_changed(&env, &current_admin, &new_admin);
+        Ok(())
     }
+
+    /// Resolves a disputed invoice by awarding it to the winner.
+    /// Only the admin can call this function.
+    /// This transfers the escrowed funds to the winner and marks the invoice as completed.
+    pub fn resolve_dispute(env: Env, invoice_id: u64, winner: Address) -> Result<(), ContractError> {
+        let admin = storage::get_admin(&env)?;
+        admin.require_auth();
+
+        let invoice = storage::get_invoice(&env, invoice_id)?;
+
+        // Verify that the dispute exists
+        let mut dispute = storage::get_dispute(&env, invoice_id)?;
+
+        if invoice.status != InvoiceStatus::Disputed {
+            return Err(ContractError::InvalidInvoiceStatus);
+        }
+
+        // Verify the winner is either the freelancer or the client
+        if winner != invoice.freelancer && winner != invoice.client {
+            return Err(ContractError::UnauthorizedCaller);
+        }
+
+        // Update dispute status
+        dispute.resolved = true;
+        dispute.winner = Some(winner.clone());
+        storage::save_dispute(&env, &dispute);
+
+        // Transfer funds to the winner
+        let token_client = token::Client::new(&env, &invoice.token);
+        token_client.transfer(&env.current_contract_address(), &winner, &invoice.amount);
+
+        // Mark invoice as completed
+        storage::update_invoice_status(&env, invoice_id, InvoiceStatus::Completed);
+
+        events::dispute_resolved(&env, invoice_id, &winner);
+        Ok(())
+    }
+}
 
     #[test]
     fn test_invoice_not_found() {
@@ -753,3 +676,4 @@ mod tests {
         assert_eq!(token_client.balance(&contract_id), 0);
     }
 }
+

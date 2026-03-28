@@ -1,10 +1,20 @@
 use soroban_sdk::{contracterror, contracttype, Address, Env, String};
+use crate::constants::{TTL_THRESHOLD, TTL_EXTEND_TO, MAX_DESCRIPTION_LEN};
 
+/// Contract-level errors returned by state-changing functions.
 #[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ContractError {
+    /// The invoice does not exist.
     InvoiceNotFound = 1,
+    /// The invoice is not in the required status for this operation.
+    InvalidInvoiceStatus = 2,
+    /// The caller is not authorised to perform this operation.
+    UnauthorizedCaller = 3,
+    /// The description exceeds the maximum allowed length.
+    DescriptionTooLong = 4,
+    /// The token provided does not match the invoice's token.
+    TokenMismatch = 5,
 }
 
 /// Represents the lifecycle state of an invoice.
@@ -17,6 +27,8 @@ pub enum InvoiceStatus {
     Funded,
     /// Freelancer has marked work as delivered.
     Delivered,
+    /// Client disputes the invoice.
+    Disputed,
     /// Client has approved the delivery.
     Approved,
     /// Funds have been released to the freelancer.
@@ -37,19 +49,41 @@ pub struct Invoice {
     pub client: Address,
     /// Payment amount in the smallest token unit (stroops).
     pub amount: i128,
+    /// Short human-readable title for the invoice.
+    pub title: String,
     /// Human-readable description of the work to be performed.
     pub description: String,
+    /// Address of the token contract used for payment.
+    pub token: Address,
+    /// Unix timestamp after which the invoice can no longer be funded.
+    pub deadline: u64,
+    /// Unix timestamp when the invoice was created.
+    pub created_at: u64,
     /// Current state of the invoice in the escrow lifecycle.
     pub status: InvoiceStatus,
-    // TODO: Add deadline / expiry field
-    // TODO: Add token address field for multi-token support
-    // See: https://github.com/your-org/StarInvoice/issues/6
+}
+
+/// Represents a dispute on an invoice.
+#[contracttype]
+#[derive(Clone)]
+pub struct Dispute {
+    /// The invoice ID that this dispute relates to.
+    pub invoice_id: u64,
+    /// Whether the dispute has been resolved.
+    pub resolved: bool,
+    /// Address of the winner (either freelancer or client).
+    /// None if the dispute is still pending resolution.
+    pub winner: Option<Address>,
 }
 
 #[contracttype]
 enum DataKey {
     Invoice(u64),
     InvoiceCount,
+    InvoicesByFreelancer(Address),
+    InvoicesByClient(Address),
+    Admin,
+    Dispute(u64),
 }
 
 /// Returns the current invoice count from storage.
@@ -73,11 +107,11 @@ pub fn get_invoice_count(env: &Env) -> u64 {
 pub fn next_invoice_id(env: &Env) -> u64 {
     let count: u64 = env
         .storage()
-        .instance()
+        .persistent()
         .get(&DataKey::InvoiceCount)
         .unwrap_or(0);
     env.storage()
-        .instance()
+        .persistent()
         .set(&DataKey::InvoiceCount, &(count + 1));
     count
 }
@@ -87,9 +121,39 @@ pub fn next_invoice_id(env: &Env) -> u64 {
 /// # Parameters
 /// - `invoice`: The invoice to save.
 pub fn save_invoice(env: &Env, invoice: &Invoice) {
+    let key = DataKey::Invoice(invoice.id);
+    env.storage().persistent().set(&key, invoice);
     env.storage()
         .persistent()
-        .set(&DataKey::Invoice(invoice.id), invoice);
+        .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+
+    // Update freelancer index
+    let freelancer_key = DataKey::InvoicesByFreelancer(invoice.freelancer.clone());
+    let mut freelancer_invoices = env
+        .storage()
+        .persistent()
+        .get::<_, soroban_sdk::Vec<u64>>(&freelancer_key)
+        .unwrap_or_else(|| soroban_sdk::Vec::new(env));
+    if !freelancer_invoices.iter().any(|id| id == invoice.id) {
+        freelancer_invoices.push_back(invoice.id);
+        env.storage()
+            .persistent()
+            .set(&freelancer_key, &freelancer_invoices);
+    }
+
+    // Update client index
+    let client_key = DataKey::InvoicesByClient(invoice.client.clone());
+    let mut client_invoices = env
+        .storage()
+        .persistent()
+        .get::<_, soroban_sdk::Vec<u64>>(&client_key)
+        .unwrap_or_else(|| soroban_sdk::Vec::new(env));
+    if !client_invoices.iter().any(|id| id == invoice.id) {
+        client_invoices.push_back(invoice.id);
+        env.storage()
+            .persistent()
+            .set(&client_key, &client_invoices);
+    }
 }
 
 /// Retrieves an invoice by ID from persistent storage.
@@ -100,8 +164,76 @@ pub fn save_invoice(env: &Env, invoice: &Invoice) {
 /// # Returns
 /// `Ok(Invoice)` if found, `Err(ContractError::InvoiceNotFound)` otherwise.
 pub fn get_invoice(env: &Env, invoice_id: u64) -> Result<Invoice, ContractError> {
+    let key = DataKey::Invoice(invoice_id);
+    let invoice = env
+        .storage()
+        .persistent()
+        .get(&key)
+        .ok_or(ContractError::InvoiceNotFound)?;
     env.storage()
         .persistent()
-        .get(&DataKey::Invoice(invoice_id))
-        .ok_or(ContractError::InvoiceNotFound)
+        .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+    Ok(invoice)
 }
+
+/// Returns all invoice IDs for a given freelancer.
+pub fn get_invoices_by_freelancer(env: &Env, freelancer: &Address) -> soroban_sdk::Vec<u64> {
+    let key = DataKey::InvoicesByFreelancer(freelancer.clone());
+    env.storage()
+        .persistent()
+        .get(&key)
+        .unwrap_or_else(|| soroban_sdk::Vec::new(env))
+}
+
+/// Returns all invoice IDs for a given client.
+pub fn get_invoices_by_client(env: &Env, client: &Address) -> soroban_sdk::Vec<u64> {
+    let key = DataKey::InvoicesByClient(client.clone());
+    env.storage()
+        .persistent()
+        .get(&key)
+        .unwrap_or_else(|| soroban_sdk::Vec::new(env))
+}
+
+/// Updates the status of an invoice without modifying other fields.
+pub fn update_invoice_status(env: &Env, invoice_id: u64, new_status: InvoiceStatus) {
+    let key = DataKey::Invoice(invoice_id);
+    if let Ok(mut invoice) = get_invoice(env, invoice_id) {
+        invoice.status = new_status;
+        env.storage().persistent().set(&key, &invoice);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+    }
+}
+
+/// Returns the current admin address, or an error if not initialized.
+pub fn get_admin(env: &Env) -> Result<Address, ContractError> {
+    env.storage()
+        .instance()
+        .get(&DataKey::Admin)
+        .ok_or(ContractError::NotInitialized)
+}
+
+/// Sets the admin address.
+pub fn set_admin(env: &Env, admin: &Address) {
+    env.storage().instance().set(&DataKey::Admin, admin);
+}
+
+/// Retrieves a dispute by invoice ID, returning an error if not found.
+pub fn get_dispute(env: &Env, invoice_id: u64) -> Result<Dispute, ContractError> {
+    let key = DataKey::Dispute(invoice_id);
+    env.storage()
+        .persistent()
+        .get(&key)
+        .ok_or(ContractError::DisputeNotFound)
+}
+
+/// Creates or updates a dispute for the given invoice.
+pub fn save_dispute(env: &Env, dispute: &Dispute) {
+    let key = DataKey::Dispute(dispute.invoice_id);
+    env.storage().persistent().set(&key, dispute);
+    env.storage()
+        .persistent()
+        .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+}
+
