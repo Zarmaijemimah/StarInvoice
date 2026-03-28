@@ -13,10 +13,8 @@ pub enum ContractError {
     UnauthorizedCaller = 3,
     /// The description exceeds the maximum allowed length.
     DescriptionTooLong = 4,
-    /// The dispute does not exist for this invoice.
-    DisputeNotFound = 5,
-    /// Contract has not been initialized.
-    NotInitialized = 6,
+    /// The token provided does not match the invoice's token.
+    TokenMismatch = 5,
 }
 
 /// Represents the lifecycle state of an invoice.
