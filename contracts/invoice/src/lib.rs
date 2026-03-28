@@ -1,4 +1,5 @@
 #![no_std]
+#![deny(unused_variables)]
 
 mod constants;
 mod events;
