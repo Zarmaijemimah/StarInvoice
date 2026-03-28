@@ -80,4 +80,34 @@ mod tests {
         let result = contract_client.try_create_invoice(&freelancer, &client, &amount, &token_address, &9999999999, &description);
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_create_invoice_unique_ids() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let contract_client = InvoiceContractClient::new(&env, &contract_id);
+
+        let (freelancer, client, token_address, amount) = setup(&env);
+        let description = String::from_str(&env, "Unique ID test");
+
+        let mut seen_ids = std::collections::HashSet::new();
+
+        for expected_id in 0u64..10 {
+            let invoice_id = contract_client.create_invoice(
+                &freelancer,
+                &client,
+                &amount,
+                &token_address,
+                &9999999999,
+                &description,
+            ).unwrap();
+
+            assert_eq!(invoice_id, expected_id, "ID should increment sequentially");
+            assert!(seen_ids.insert(invoice_id), "Duplicate ID detected: {}", invoice_id);
+        }
+
+        assert_eq!(seen_ids.len(), 10);
+    }
 }
