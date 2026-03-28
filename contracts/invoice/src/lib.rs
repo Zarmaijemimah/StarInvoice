@@ -5,7 +5,10 @@ mod constants;
 mod events;
 mod storage;
 
-use soroban_sdk::{contract, contractimpl, panic_with_error, token, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, contractmeta, token, Address, Env, String};
+
+contractmeta!(key = "Description", val = "StarInvoice escrow contract");
+contractmeta!(key = "Version", val = "0.1.0");
 
 pub use storage::{ContractError, Invoice, InvoiceStatus};
 
