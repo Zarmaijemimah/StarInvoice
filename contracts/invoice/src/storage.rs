@@ -86,7 +86,10 @@ enum DataKey {
     Dispute(u64),
 }
 
-/// Returns the current invoice count.
+/// Returns the current invoice count from storage.
+///
+/// # Returns
+/// The total number of invoices created, or 0 if none exist.
 pub fn get_invoice_count(env: &Env) -> u64 {
     env.storage()
         .instance()
@@ -95,12 +98,12 @@ pub fn get_invoice_count(env: &Env) -> u64 {
 }
 
 /// Returns the next available invoice ID and increments the counter.
-/// 
-/// NOTE: Soroban transactions are atomic at the transaction level. Each transaction
-/// is executed in isolation and either fully succeeds or fully fails. Therefore,
-/// even though this function performs two storage operations (read and write),
-/// they are guaranteed to be atomic within a single transaction. No race condition
-/// can occur because concurrent transactions are serialized by the ledger.
+///
+/// # Returns
+/// The next sequential invoice ID to be assigned.
+///
+/// # Note
+/// This operation is atomic within a single Soroban transaction.
 pub fn next_invoice_id(env: &Env) -> u64 {
     let count: u64 = env
         .storage()
@@ -113,7 +116,10 @@ pub fn next_invoice_id(env: &Env) -> u64 {
     count
 }
 
-/// Persists an invoice to on-chain storage, keyed by its ID.
+/// Persists an invoice to on-chain persistent storage, keyed by its ID.
+///
+/// # Parameters
+/// - `invoice`: The invoice to save.
 pub fn save_invoice(env: &Env, invoice: &Invoice) {
     let key = DataKey::Invoice(invoice.id);
     env.storage().persistent().set(&key, invoice);
@@ -150,7 +156,13 @@ pub fn save_invoice(env: &Env, invoice: &Invoice) {
     }
 }
 
-/// Retrieves an invoice by ID, returning an error if not found.
+/// Retrieves an invoice by ID from persistent storage.
+///
+/// # Parameters
+/// - `invoice_id`: The ID of the invoice to retrieve.
+///
+/// # Returns
+/// `Ok(Invoice)` if found, `Err(ContractError::InvoiceNotFound)` otherwise.
 pub fn get_invoice(env: &Env, invoice_id: u64) -> Result<Invoice, ContractError> {
     let key = DataKey::Invoice(invoice_id);
     let invoice = env

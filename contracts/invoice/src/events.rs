@@ -72,6 +72,21 @@ pub fn invoice_disputed(env: &Env, invoice_id: u64, client: &Address) {
     );
 }
 
+/// Emits an event when a freelancer marks work as delivered.
+///
+/// Topic: `("INVOICE", "delivered")`
+/// Data:  `(invoice_id, freelancer)`
+/// Emits an event when a freelancer marks work as delivered.
+///
+/// Topic: `("INVOICE", "delivered")`
+/// Data:  `(invoice_id, freelancer)`
+pub fn mark_delivered(env: &Env, invoice_id: u64, freelancer: &Address) {
+    env.events().publish(
+        (symbol_short!("INVOICE"), symbol_short!("released")),
+        (invoice_id, freelancer.clone(), amount),
+    );
+}
+
 /// Emits an event when escrowed funds are released to the freelancer.
 ///
 /// Topic: `("INVOICE", "released")`
@@ -82,74 +97,3 @@ pub fn release_payment(env: &Env, invoice_id: u64, freelancer: &Address, amount:
         (invoice_id, freelancer.clone(), amount),
     );
 }
-
-// TODO: Add event emitters for each state transition:
-// - mark_delivered  -> emit "INVOICE delivered" | data: (invoice_id, freelancer)
-// See: https://github.com/your-org/StarInvoice/issues/7
-
-/// Emits an event when escrowed funds are released to the freelancer.
-///
-/// Topic: `("INVOICE", "released")`
-/// Data:  `(invoice_id, freelancer, amount)`
-pub fn invoice_released(env: &Env, invoice_id: u64, freelancer: &Address, amount: i128) {
-    env.events().publish(
-        (symbol_short!("INVOICE"), symbol_short!("released")),
-        (invoice_id, freelancer.clone(), amount),
-    );
-}
-
-/// Emits an event when the contract admin is initialized.
-///
-/// Topic: `("ADMIN", "initialized")`
-/// Data:  `(admin_address)`
-pub fn admin_initialized(env: &Env, admin: &Address) {
-    env.events().publish(
-        (symbol_short!("ADMIN"), symbol_short!("init")),
-        admin.clone(),
-    );
-}
-
-/// Emits an event when the admin address is changed.
-///
-/// Topic: `("ADMIN", "changed")`
-/// Data:  `(old_admin, new_admin)`
-pub fn admin_changed(env: &Env, old_admin: &Address, new_admin: &Address) {
-    env.events().publish(
-        (symbol_short!("ADMIN"), symbol_short!("changed")),
-        (old_admin.clone(), new_admin.clone()),
-    );
-}
-
-/// Emits an event when a dispute is resolved by the admin.
-///
-/// Topic: `("DISPUTE", "resolved")`
-/// Data:  `(invoice_id, winner)`
-pub fn dispute_resolved(env: &Env, invoice_id: u64, winner: &Address) {
-    env.events().publish(
-        (symbol_short!("DISPUTE"), symbol_short!("resolved")),
-        (invoice_id, winner.clone()),
-    );
-}
-
-/// Emits an event when an invoice is refunded to the client.
-///
-/// Topic: `("INVOICE", "refunded")`
-/// Data:  `(invoice_id, client, amount)`
-pub fn invoice_refunded(env: &Env, invoice_id: u64, client: &Address, amount: i128) {
-    env.events().publish(
-        (symbol_short!("INVOICE"), symbol_short!("refunded")),
-        (invoice_id, client.clone(), amount),
-    );
-}
-
-/// Emits an event when an invoice is disputed.
-///
-/// Topic: `("INVOICE", "disputed")`
-/// Data:  `(invoice_id, caller)`
-pub fn invoice_disputed(env: &Env, invoice_id: u64, caller: &Address) {
-    env.events().publish(
-        (symbol_short!("INVOICE"), symbol_short!("disputed")),
-        (invoice_id, caller.clone()),
-    );
-}
-
