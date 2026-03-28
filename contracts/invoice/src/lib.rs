@@ -10,6 +10,10 @@ use soroban_sdk::{contract, contractimpl, contractmeta, token, Address, Env, Str
 contractmeta!(key = "Description", val = "StarInvoice escrow contract");
 contractmeta!(key = "Version", val = "0.1.0");
 
+// `Invoice` is returned by the public `get_invoice` contract function, so it must be
+// re-exported here for the Soroban-generated client bindings to reference the type.
+// `ContractError` and `InvoiceStatus` are likewise part of the public ABI.
+// None of these re-exports can be removed without breaking the contract interface.
 pub use storage::{ContractError, Invoice, InvoiceStatus};
 
 /// Validates whether a status transition is allowed.
