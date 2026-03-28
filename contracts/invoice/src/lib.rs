@@ -8,6 +8,61 @@ use soroban_sdk::{contract, contractimpl, token, Address, Env, String};
 
 pub use storage::{ContractError, Invoice, InvoiceStatus};
 
+/// # Soroban Token Interface for Transfers
+/// 
+/// This contract uses Soroban's token interface to handle token transfers for invoice funding
+/// and payment release. The token interface provides a standardized way to interact with
+/// token contracts on the Soroban network.
+/// 
+/// ## Creating a Token Client
+/// 
+/// To interact with a token contract, you first create a `token::Client`:
+/// 
+/// ```rust
+/// let token_client = token::Client::new(&env, &token_address);
+/// ```
+/// 
+/// Where:
+/// - `env`: The Soroban environment instance
+/// - `token_address`: The address of the token contract
+/// 
+/// ## Performing Token Transfers
+/// 
+/// Once you have a token client, you can transfer tokens between addresses:
+/// 
+/// ```rust
+/// token_client.transfer(&from_address, &to_address, &amount);
+/// ```
+/// 
+/// Where:
+/// - `from_address`: The address sending the tokens (must have sufficient balance)
+/// - `to_address`: The address receiving the tokens
+/// - `amount`: The amount of tokens to transfer (as `i128`)
+/// 
+/// ## Examples in This Contract
+/// 
+/// ### Funding an Invoice (Client → Contract)
+/// In `fund_invoice`, tokens are transferred from the client to the contract's escrow:
+/// ```rust
+/// let token_client = token::Client::new(&env, &invoice.token);
+/// token_client.transfer(&invoice.client, &env.current_contract_address(), &invoice.amount);
+/// ```
+/// 
+/// ### Releasing Payment (Contract → Freelancer)
+/// In `release_payment`, tokens are transferred from the contract to the freelancer:
+/// ```rust
+/// let token_client = token::Client::new(&env, &token_address);
+/// token_client.transfer(&env.current_contract_address(), &invoice.freelancer, &invoice.amount);
+/// ```
+/// 
+/// ## Important Notes
+/// - The `from` address must have authorized the transfer (via `require_auth()`)
+/// - Token transfers will fail if the `from` address has insufficient balance
+/// - All addresses must be valid Soroban addresses
+/// - Amounts must be positive integers
+/// 
+/// For more details, see the Soroban SDK documentation on token interfaces.
+
 /// Validates whether a status transition is allowed.
 ///
 /// Returns `true` if transitioning `from` → `to` is a legal state change.
