@@ -72,21 +72,6 @@ pub fn invoice_disputed(env: &Env, invoice_id: u64, client: &Address) {
     );
 }
 
-/// Emits an event when a freelancer marks work as delivered.
-///
-/// Topic: `("INVOICE", "delivered")`
-/// Data:  `(invoice_id, freelancer)`
-/// Emits an event when a freelancer marks work as delivered.
-///
-/// Topic: `("INVOICE", "delivered")`
-/// Data:  `(invoice_id, freelancer)`
-pub fn mark_delivered(env: &Env, invoice_id: u64, freelancer: &Address) {
-    env.events().publish(
-        (symbol_short!("INVOICE"), symbol_short!("released")),
-        (invoice_id, freelancer.clone(), amount),
-    );
-}
-
 /// Emits an event when escrowed funds are released to the freelancer.
 ///
 /// Topic: `("INVOICE", "released")`

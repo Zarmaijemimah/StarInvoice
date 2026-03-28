@@ -15,6 +15,16 @@ pub enum ContractError {
     DescriptionTooLong = 4,
     /// The invoice amount exceeds the maximum allowed amount.
     AmountExceedsMaximum = 5,
+    /// The contract has not been initialised with an admin.
+    NotInitialized = 6,
+    /// No dispute exists for the given invoice.
+    DisputeNotFound = 7,
+    /// The provided token address does not match the invoice token.
+    TokenMismatch = 8,
+    /// The invoice amount must be greater than zero.
+    InvalidAmount = 9,
+    /// The freelancer and client must be different addresses.
+    InvalidParties = 10,
 }
 
 /// Represents the lifecycle state of an invoice.
