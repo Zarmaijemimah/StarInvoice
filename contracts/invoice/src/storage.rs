@@ -13,6 +13,10 @@ pub enum ContractError {
     UnauthorizedCaller = 3,
     /// The description exceeds the maximum allowed length.
     DescriptionTooLong = 4,
+    /// The dispute does not exist for this invoice.
+    DisputeNotFound = 5,
+    /// Contract has not been initialized.
+    NotInitialized = 6,
 }
 
 /// Represents the lifecycle state of an invoice.
@@ -33,8 +37,6 @@ pub enum InvoiceStatus {
     Completed,
     /// Invoice has been voided by the freelancer or client.
     Cancelled,
-    /// Invoice is currently under dispute.
-    Disputed,
 }
 
 /// Core invoice data structure stored on-chain.
@@ -63,12 +65,27 @@ pub struct Invoice {
     pub status: InvoiceStatus,
 }
 
+/// Represents a dispute on an invoice.
+#[contracttype]
+#[derive(Clone)]
+pub struct Dispute {
+    /// The invoice ID that this dispute relates to.
+    pub invoice_id: u64,
+    /// Whether the dispute has been resolved.
+    pub resolved: bool,
+    /// Address of the winner (either freelancer or client).
+    /// None if the dispute is still pending resolution.
+    pub winner: Option<Address>,
+}
+
 #[contracttype]
 enum DataKey {
     Invoice(u64),
     InvoiceCount,
     InvoicesByFreelancer(Address),
     InvoicesByClient(Address),
+    Admin,
+    Dispute(u64),
 }
 
 /// Returns the current invoice count.
@@ -166,3 +183,47 @@ pub fn get_invoices_by_client(env: &Env, client: &Address) -> soroban_sdk::Vec<u
         .get(&key)
         .unwrap_or_else(|| soroban_sdk::Vec::new(env))
 }
+
+/// Updates the status of an invoice without modifying other fields.
+pub fn update_invoice_status(env: &Env, invoice_id: u64, new_status: InvoiceStatus) {
+    let key = DataKey::Invoice(invoice_id);
+    if let Ok(mut invoice) = get_invoice(env, invoice_id) {
+        invoice.status = new_status;
+        env.storage().persistent().set(&key, &invoice);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+    }
+}
+
+/// Returns the current admin address, or an error if not initialized.
+pub fn get_admin(env: &Env) -> Result<Address, ContractError> {
+    env.storage()
+        .instance()
+        .get(&DataKey::Admin)
+        .ok_or(ContractError::NotInitialized)
+}
+
+/// Sets the admin address.
+pub fn set_admin(env: &Env, admin: &Address) {
+    env.storage().instance().set(&DataKey::Admin, admin);
+}
+
+/// Retrieves a dispute by invoice ID, returning an error if not found.
+pub fn get_dispute(env: &Env, invoice_id: u64) -> Result<Dispute, ContractError> {
+    let key = DataKey::Dispute(invoice_id);
+    env.storage()
+        .persistent()
+        .get(&key)
+        .ok_or(ContractError::DisputeNotFound)
+}
+
+/// Creates or updates a dispute for the given invoice.
+pub fn save_dispute(env: &Env, dispute: &Dispute) {
+    let key = DataKey::Dispute(dispute.invoice_id);
+    env.storage().persistent().set(&key, dispute);
+    env.storage()
+        .persistent()
+        .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+}
+
