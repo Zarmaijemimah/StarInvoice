@@ -6,6 +6,10 @@ mod storage;
 
 use soroban_sdk::{contract, contractimpl, token, Address, Env, String};
 
+// `Invoice` is returned by the public `get_invoice` contract function, so it must be
+// re-exported here for the Soroban-generated client bindings to reference the type.
+// `ContractError` and `InvoiceStatus` are likewise part of the public ABI.
+// None of these re-exports can be removed without breaking the contract interface.
 pub use storage::{ContractError, Invoice, InvoiceStatus};
 
 /// # Soroban Token Interface for Transfers
