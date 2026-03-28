@@ -35,8 +35,6 @@ pub enum InvoiceStatus {
     Completed,
     /// Invoice has been voided by the freelancer or client.
     Cancelled,
-    /// Invoice is currently under dispute.
-    Disputed,
 }
 
 /// Core invoice data structure stored on-chain.
@@ -65,15 +63,33 @@ pub struct Invoice {
     pub status: InvoiceStatus,
 }
 
+/// Represents a dispute on an invoice.
+#[contracttype]
+#[derive(Clone)]
+pub struct Dispute {
+    /// The invoice ID that this dispute relates to.
+    pub invoice_id: u64,
+    /// Whether the dispute has been resolved.
+    pub resolved: bool,
+    /// Address of the winner (either freelancer or client).
+    /// None if the dispute is still pending resolution.
+    pub winner: Option<Address>,
+}
+
 #[contracttype]
 enum DataKey {
     Invoice(u64),
     InvoiceCount,
     InvoicesByFreelancer(Address),
     InvoicesByClient(Address),
+    Admin,
+    Dispute(u64),
 }
 
-/// Returns the current invoice count.
+/// Returns the current invoice count from storage.
+///
+/// # Returns
+/// The total number of invoices created, or 0 if none exist.
 pub fn get_invoice_count(env: &Env) -> u64 {
     env.storage()
         .instance()
@@ -82,12 +98,12 @@ pub fn get_invoice_count(env: &Env) -> u64 {
 }
 
 /// Returns the next available invoice ID and increments the counter.
-/// 
-/// NOTE: Soroban transactions are atomic at the transaction level. Each transaction
-/// is executed in isolation and either fully succeeds or fully fails. Therefore,
-/// even though this function performs two storage operations (read and write),
-/// they are guaranteed to be atomic within a single transaction. No race condition
-/// can occur because concurrent transactions are serialized by the ledger.
+///
+/// # Returns
+/// The next sequential invoice ID to be assigned.
+///
+/// # Note
+/// This operation is atomic within a single Soroban transaction.
 pub fn next_invoice_id(env: &Env) -> u64 {
     let count: u64 = env
         .storage()
@@ -100,7 +116,10 @@ pub fn next_invoice_id(env: &Env) -> u64 {
     count
 }
 
-/// Persists an invoice to on-chain storage, keyed by its ID.
+/// Persists an invoice to on-chain persistent storage, keyed by its ID.
+///
+/// # Parameters
+/// - `invoice`: The invoice to save.
 pub fn save_invoice(env: &Env, invoice: &Invoice) {
     let key = DataKey::Invoice(invoice.id);
     env.storage().persistent().set(&key, invoice);
@@ -137,7 +156,13 @@ pub fn save_invoice(env: &Env, invoice: &Invoice) {
     }
 }
 
-/// Retrieves an invoice by ID, returning an error if not found.
+/// Retrieves an invoice by ID from persistent storage.
+///
+/// # Parameters
+/// - `invoice_id`: The ID of the invoice to retrieve.
+///
+/// # Returns
+/// `Ok(Invoice)` if found, `Err(ContractError::InvoiceNotFound)` otherwise.
 pub fn get_invoice(env: &Env, invoice_id: u64) -> Result<Invoice, ContractError> {
     let key = DataKey::Invoice(invoice_id);
     let invoice = env
@@ -168,3 +193,47 @@ pub fn get_invoices_by_client(env: &Env, client: &Address) -> soroban_sdk::Vec<u
         .get(&key)
         .unwrap_or_else(|| soroban_sdk::Vec::new(env))
 }
+
+/// Updates the status of an invoice without modifying other fields.
+pub fn update_invoice_status(env: &Env, invoice_id: u64, new_status: InvoiceStatus) {
+    let key = DataKey::Invoice(invoice_id);
+    if let Ok(mut invoice) = get_invoice(env, invoice_id) {
+        invoice.status = new_status;
+        env.storage().persistent().set(&key, &invoice);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+    }
+}
+
+/// Returns the current admin address, or an error if not initialized.
+pub fn get_admin(env: &Env) -> Result<Address, ContractError> {
+    env.storage()
+        .instance()
+        .get(&DataKey::Admin)
+        .ok_or(ContractError::NotInitialized)
+}
+
+/// Sets the admin address.
+pub fn set_admin(env: &Env, admin: &Address) {
+    env.storage().instance().set(&DataKey::Admin, admin);
+}
+
+/// Retrieves a dispute by invoice ID, returning an error if not found.
+pub fn get_dispute(env: &Env, invoice_id: u64) -> Result<Dispute, ContractError> {
+    let key = DataKey::Dispute(invoice_id);
+    env.storage()
+        .persistent()
+        .get(&key)
+        .ok_or(ContractError::DisputeNotFound)
+}
+
+/// Creates or updates a dispute for the given invoice.
+pub fn save_dispute(env: &Env, dispute: &Dispute) {
+    let key = DataKey::Dispute(dispute.invoice_id);
+    env.storage().persistent().set(&key, dispute);
+    env.storage()
+        .persistent()
+        .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+}
+
