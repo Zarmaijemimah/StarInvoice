@@ -25,9 +25,10 @@ mod tests {
         token: &Address,
         amount: i128,
     ) -> u64 {
+        let title = String::from_str(env, "Test");
         let description = String::from_str(env, "Test invoice");
-        let id = client.create_invoice(freelancer, payer, &amount, token, &9999999999, &description);
-        client.fund_invoice(&id);
+        let id = client.create_invoice(freelancer, payer, &amount, token, &9999999999, &title, &description);
+        client.fund_invoice(&id, token);
         id
     }
 
@@ -75,8 +76,9 @@ mod tests {
         let contract_client = InvoiceContractClient::new(&env, &contract_id);
 
         let (freelancer, client, token_address, amount) = setup(&env);
+        let title = String::from_str(&env, "Test");
         let description = String::from_str(&env, "Test invoice");
-        let invoice_id = contract_client.create_invoice(&freelancer, &client, &amount, &token_address, &9999999999, &description);
+        let invoice_id = contract_client.create_invoice(&freelancer, &client, &amount, &token_address, &9999999999, &title, &description);
 
         let result = contract_client.try_dispute_invoice(&invoice_id);
         assert!(result.is_err());
