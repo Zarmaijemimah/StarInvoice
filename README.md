@@ -10,6 +10,14 @@ StarInvoice lets freelancers create on-chain invoices and receive payment throug
 
 This project is intentionally minimal. The `create_invoice` function is implemented. All other escrow functions are stubbed with `TODO` comments and open GitHub issues for contributors to pick up.
 
+## ❤️ Support the Project
+
+StarInvoice is maintained by the community. If you find this project useful, consider supporting its development:
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ff69b4)](https://github.com/sponsors/onahiOMOTI)
+
+You can sponsor via **GitHub Sponsors** or other platforms listed in [FUNDING.yml](.github/FUNDING.yml).
+
 ## Contract Flow
 
 ```
