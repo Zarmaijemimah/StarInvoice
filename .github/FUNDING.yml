@@ -1,0 +1,17 @@
+# .github/FUNDING.yml
+# GitHub Sponsors / Open Collective funding configuration for StarInvoice
+
+github: [onahiOMOTI]                    # Your GitHub username for GitHub Sponsors
+# open_collective: starinvoice           # Uncomment and update if you create an Open Collective
+# patreon: your-patreon-username         # Optional
+# ko_fi: your-kofi-username              # Optional
+# liberapay: your-liberapay-username     # Optional
+# issuehunt: your-issuehunt-username     # Optional
+# custom:                                # Custom funding links
+#   - https://buymeacoffee.com/onahiOMOTI
+#   - https://paypal.me/onahiOMOTI
+
+# Community & Maintainer Funding
+# This file enables the "Sponsor" button on your repository and shows funding options in the README.
+
+# Recommended: Start with GitHub Sponsors first

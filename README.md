@@ -10,6 +10,14 @@ StarInvoice lets freelancers create on-chain invoices and receive payment throug
 
 This project is intentionally minimal. The `create_invoice` function is implemented. All other escrow functions are stubbed with `TODO` comments and open GitHub issues for contributors to pick up.
 
+## ❤️ Support the Project
+
+StarInvoice is maintained by the community. If you find this project useful, consider supporting its development:
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ff69b4)](https://github.com/sponsors/onahiOMOTI)
+
+You can sponsor via **GitHub Sponsors** or other platforms listed in [FUNDING.yml](.github/FUNDING.yml).
+
 ## Contract Flow
 
 ```
@@ -216,6 +224,42 @@ cargo build --target wasm32-unknown-unknown --release
 ```bash
 cargo test
 ```
+
+## 🚀 Roadmap
+
+StarInvoice is evolving to become a robust, community-driven invoicing and escrow platform on Stellar.
+
+### v0.1 - Core Escrow (Completed ✅)
+- Basic invoice creation and sharing
+- Simple escrow payment holding
+- Wallet connection (Freighter)
+- Basic status tracking
+
+### v0.2 - Disputes & Cancellation (In Progress)
+- Cancellation workflow with reason tracking
+- Basic dispute raising mechanism
+- Improved escrow release conditions
+- Better transaction history
+
+### v0.3 - Multi-token & Advanced Features (Planned)
+- Support for multiple Stellar assets (XLM, USDC, custom tokens)
+- Milestone-based payments with deadlines
+- Enhanced dispute resolution system
+- Invoice templates and customization
+- Payment reminders and notifications
+
+### v0.4 - Future (Long-term)
+- DAO governance for dispute resolution
+- Analytics dashboard
+- Mobile app support
+- Integration with accounting tools
+
+---
+
+**Want to help?**  
+Check out our **[Good First Issues](https://github.com/onahiOMOTI/StarInvoice/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)** or pick any item from the roadmap above and start contributing!
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Contributing
 
