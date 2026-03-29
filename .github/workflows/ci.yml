@@ -27,11 +27,11 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: Install Soroban CLI
-        run: cargo install --locked soroban-cli
+        run: cargo install --locked stellar-cli --features opt
       - name: Build WASM
         run: cargo build --target wasm32-unknown-unknown --release
       - name: Optimize WASM
-        run: soroban contract optimize --wasm target/wasm32-unknown-unknown/release/star_invoice.wasm
+        run: stellar contract optimize --wasm target/wasm32-unknown-unknown/release/star_invoice.wasm
 
   clippy:
     runs-on: ubuntu-latest
