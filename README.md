@@ -225,6 +225,42 @@ cargo build --target wasm32-unknown-unknown --release
 cargo test
 ```
 
+## 🚀 Roadmap
+
+StarInvoice is evolving to become a robust, community-driven invoicing and escrow platform on Stellar.
+
+### v0.1 - Core Escrow (Completed ✅)
+- Basic invoice creation and sharing
+- Simple escrow payment holding
+- Wallet connection (Freighter)
+- Basic status tracking
+
+### v0.2 - Disputes & Cancellation (In Progress)
+- Cancellation workflow with reason tracking
+- Basic dispute raising mechanism
+- Improved escrow release conditions
+- Better transaction history
+
+### v0.3 - Multi-token & Advanced Features (Planned)
+- Support for multiple Stellar assets (XLM, USDC, custom tokens)
+- Milestone-based payments with deadlines
+- Enhanced dispute resolution system
+- Invoice templates and customization
+- Payment reminders and notifications
+
+### v0.4 - Future (Long-term)
+- DAO governance for dispute resolution
+- Analytics dashboard
+- Mobile app support
+- Integration with accounting tools
+
+---
+
+**Want to help?**  
+Check out our **[Good First Issues](https://github.com/onahiOMOTI/StarInvoice/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)** or pick any item from the roadmap above and start contributing!
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for how to get involved.
