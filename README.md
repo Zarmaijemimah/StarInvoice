@@ -217,6 +217,15 @@ cargo install --locked soroban-cli
 
 ```bash
 cargo build --target wasm32-unknown-unknown --release
+soroban contract optimize --wasm target/wasm32-unknown-unknown/release/star_invoice.wasm
+```
+
+The `soroban contract optimize` step runs `wasm-opt` on the compiled binary to shrink its size, reducing deployment costs. Both commands are also combined in `make build`.
+
+Requires [Soroban CLI](https://soroban.stellar.org/docs/getting-started/setup) to be installed:
+
+```bash
+cargo install --locked soroban-cli
 ```
 
 ## Test
