@@ -2,6 +2,10 @@
 
 Thanks for your interest in contributing. This project is designed to be built incrementally — most of the escrow logic is intentionally left unimplemented so contributors can own features end-to-end.
 
+## Code of Conduct
+
+This project adheres to the Contributor Covenant [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to the project maintainers.
+
 ## Getting Started
 
 1. Fork the repo and clone it locally
