@@ -13,6 +13,17 @@ This project adheres to the Contributor Covenant [Code of Conduct](CODE_OF_CONDU
 3. Run `cargo test` to confirm the baseline passes
 4. Pick an open issue and comment to claim it
 
+## Claiming Issues
+
+To avoid duplicate work and ensure smooth collaboration, please follow this process when claiming issues:
+
+1. **Comment on the issue** you'd like to work on, expressing your interest
+2. **Wait for maintainer acknowledgment** — a maintainer will assign the issue to you or confirm you can proceed
+3. **Start work within 7 days** — if you don't begin within this timeframe, the issue will be re-opened for others to claim
+4. **Do not open PRs for unclaimed issues** — PRs submitted without prior claim and maintainer acknowledgment may be closed
+
+This process helps us coordinate contributions effectively and ensures everyone has a fair opportunity to contribute.
+
 ## Open Issues (Good First Contributions)
 
 Each TODO in the codebase maps to a GitHub issue:
