@@ -5,6 +5,7 @@ mod constants;
 mod events;
 mod storage;
 
+use crate::constants::*;
 use soroban_sdk::{contract, contractimpl, contractmeta, token, Address, Env, String};
 
 contractmeta!(key = "Description", val = "StarInvoice escrow contract");
@@ -15,6 +16,9 @@ contractmeta!(key = "Version", val = "0.1.0");
 // `ContractError` and `InvoiceStatus` are likewise part of the public ABI.
 // None of these re-exports can be removed without breaking the contract interface.
 pub use storage::{ContractError, Invoice, InvoiceStatus};
+
+#[cfg(test)]
+mod test_init;
 
 /// Validates whether a status transition is allowed.
 ///
@@ -65,7 +69,7 @@ impl InvoiceContract {
             panic_with_error!(&env, ContractError::InvalidAmount);
         }
 
-        if amount > constants::MAX_INVOICE_AMOUNT {
+        if amount > MAX_INVOICE_AMOUNT {
             panic_with_error!(&env, ContractError::AmountExceedsMaximum);
         }
 
@@ -73,7 +77,7 @@ impl InvoiceContract {
             panic_with_error!(&env, ContractError::InvalidParties);
         }
 
-        if description.len() > constants::MAX_DESCRIPTION_LEN {
+        if description.len() > MAX_DESCRIPTION_LEN {
             panic_with_error!(&env, ContractError::DescriptionTooLong);
         }
 
@@ -95,6 +99,14 @@ impl InvoiceContract {
         storage::save_invoice(&env, &invoice);
         events::invoice_created(&env, invoice_id, &freelancer, &client, amount);
         Ok(invoice_id)
+    }
+
+    /// Initializes the contract with an admin address.
+    pub fn initialize(env: Env, admin: Address) {
+        if storage::get_admin(&env).is_ok() {
+            panic!("Already initialized");
+        }
+        storage::set_admin(&env, &admin);
     }
 
     /// Allows the client to deposit funds into escrow for the given invoice.
