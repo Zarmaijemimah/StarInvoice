@@ -15,7 +15,6 @@ mod tests {
         (freelancer, client, token_address, amount)
     }
 
-    /// Advances an invoice through create → fund → deliver → approve, returning its ID.
     fn create_approved_invoice(
         env: &Env,
         c: &InvoiceContractClient,
@@ -31,8 +30,9 @@ mod tests {
             token,
             &9999999999,
             &String::from_str(env, "Test"),
+            &String::from_str(env, "Test"),
         );
-        c.fund_invoice(&id);
+        c.fund_invoice(&id, token);
         c.mark_delivered(&id);
         c.approve_payment(&id);
         id
@@ -51,13 +51,11 @@ mod tests {
 
         let id = create_approved_invoice(&env, &c, &freelancer, &client, &token, amount);
 
-        // Before release: contract holds the funds, freelancer has none
         assert_eq!(token_client.balance(&contract_id), amount);
         assert_eq!(token_client.balance(&freelancer), 0);
 
         c.release_payment(&id);
 
-        // After release: funds moved to freelancer, contract balance is zero
         assert_eq!(token_client.balance(&freelancer), amount);
         assert_eq!(token_client.balance(&contract_id), 0);
     }
@@ -87,7 +85,6 @@ mod tests {
         let c = InvoiceContractClient::new(&env, &contract_id);
         let (freelancer, client, token, amount) = setup(&env);
 
-        // Only funded — not yet delivered or approved
         let id = c.create_invoice(
             &freelancer,
             &client,
@@ -95,8 +92,9 @@ mod tests {
             &token,
             &9999999999,
             &String::from_str(&env, "Test"),
+            &String::from_str(&env, "Test"),
         );
-        c.fund_invoice(&id);
+        c.fund_invoice(&id, &token);
 
         let result = c.try_release_payment(&id);
         assert_eq!(result, Err(Ok(ContractError::InvalidInvoiceStatus)));

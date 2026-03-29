@@ -27,10 +27,11 @@ mod tests {
         let contract_client = InvoiceContractClient::new(&env, &contract_id);
 
         let (freelancer, client, token_address, amount) = setup(&env);
+        let title = String::from_str(&env, "T");
         let description = String::from_str(&env, "Test invoice");
 
-        let id1 = contract_client.create_invoice(&freelancer, &client, &amount, &token_address, &9999999999, &description);
-        let id2 = contract_client.create_invoice(&freelancer, &client, &amount, &token_address, &9999999999, &description);
+        let id1 = contract_client.create_invoice(&freelancer, &client, &amount, &token_address, &9999999999, &title, &description);
+        let id2 = contract_client.create_invoice(&freelancer, &client, &amount, &token_address, &9999999999, &title, &description);
 
         let invoices = contract_client.get_invoices_by_freelancer(&freelancer);
         assert_eq!(invoices.len(), 2);
@@ -47,10 +48,11 @@ mod tests {
         let contract_client = InvoiceContractClient::new(&env, &contract_id);
 
         let (freelancer, client, token_address, amount) = setup(&env);
+        let title = String::from_str(&env, "T");
         let description = String::from_str(&env, "Test invoice");
 
-        let id1 = contract_client.create_invoice(&freelancer, &client, &amount, &token_address, &9999999999, &description);
-        let id2 = contract_client.create_invoice(&freelancer, &client, &amount, &token_address, &9999999999, &description);
+        let id1 = contract_client.create_invoice(&freelancer, &client, &amount, &token_address, &9999999999, &title, &description);
+        let id2 = contract_client.create_invoice(&freelancer, &client, &amount, &token_address, &9999999999, &title, &description);
 
         let invoices = contract_client.get_invoices_by_client(&client);
         assert_eq!(invoices.len(), 2);
@@ -79,10 +81,11 @@ mod tests {
         token_admin_client.mint(&client1, &amount);
         token_admin_client.mint(&client2, &amount);
 
+        let title = String::from_str(&env, "T");
         let description = String::from_str(&env, "Test invoice");
 
-        let id1 = contract_client.create_invoice(&freelancer, &client1, &amount, &token_address, &9999999999, &description);
-        let id2 = contract_client.create_invoice(&freelancer, &client2, &amount, &token_address, &9999999999, &description);
+        let id1 = contract_client.create_invoice(&freelancer, &client1, &amount, &token_address, &9999999999, &title, &description);
+        let id2 = contract_client.create_invoice(&freelancer, &client2, &amount, &token_address, &9999999999, &title, &description);
 
         let freelancer_invoices = contract_client.get_invoices_by_freelancer(&freelancer);
         assert_eq!(freelancer_invoices.len(), 2);
