@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use soroban_sdk::{testutils::Address as _, token, Address, Env, String};
-    use star_invoice::{InvoiceContract, InvoiceContractClient};
+    use star_invoice::{ContractError, InvoiceContract, InvoiceContractClient};
 
     fn setup(env: &Env) -> (Address, Address, Address) {
         let token_admin = Address::generate(env);
@@ -15,7 +15,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Invoice amount must be greater than zero")]
     fn test_create_invoice_zero_amount() {
         let env = Env::default();
         env.mock_all_auths();
@@ -24,13 +23,16 @@ mod tests {
         let contract_client = InvoiceContractClient::new(&env, &contract_id);
 
         let (freelancer, client, token_address) = setup(&env);
+        let title = String::from_str(&env, "Test");
         let description = String::from_str(&env, "Test invoice");
 
-        contract_client.create_invoice(&freelancer, &client, &0, &token_address, &9999999999, &description);
+        let result = contract_client.try_create_invoice(
+            &freelancer, &client, &0, &token_address, &9999999999, &title, &description,
+        );
+        assert_eq!(result, Err(Ok(ContractError::InvalidAmount)));
     }
 
     #[test]
-    #[should_panic(expected = "Invoice amount must be greater than zero")]
     fn test_create_invoice_negative_amount() {
         let env = Env::default();
         env.mock_all_auths();
@@ -39,9 +41,13 @@ mod tests {
         let contract_client = InvoiceContractClient::new(&env, &contract_id);
 
         let (freelancer, client, token_address) = setup(&env);
+        let title = String::from_str(&env, "Test");
         let description = String::from_str(&env, "Test invoice");
 
-        contract_client.create_invoice(&freelancer, &client, &-100, &token_address, &9999999999, &description);
+        let result = contract_client.try_create_invoice(
+            &freelancer, &client, &-100, &token_address, &9999999999, &title, &description,
+        );
+        assert_eq!(result, Err(Ok(ContractError::InvalidAmount)));
     }
 
     #[test]
@@ -59,13 +65,16 @@ mod tests {
 
         let freelancer = Address::generate(&env);
         let client = Address::generate(&env);
-        let amount: i128 = 1000;
+        let amount: i128 = 1;
 
         token_admin_client.mint(&client, &amount);
 
+        let title = String::from_str(&env, "Test");
         let description = String::from_str(&env, "Test invoice");
 
-        let id = contract_client.create_invoice(&freelancer, &client, &amount, &token_address, &9999999999, &description);
+        let id = contract_client.create_invoice(
+            &freelancer, &client, &amount, &token_address, &9999999999, &title, &description,
+        );
         assert_eq!(id, 0);
     }
 }
