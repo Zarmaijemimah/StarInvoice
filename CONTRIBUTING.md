@@ -55,6 +55,39 @@ Ensure `cargo fmt` passes on all changes before opening a PR.
 3. Ensure all tests pass
 4. A maintainer will review and merge
 
+## Good First Issues
+
+Looking for a place to start? Here are some **beginner-friendly** issues that are great for new contributors. 
+These issues require minimal prior knowledge of the codebase and are perfect for your first contribution to StarInvoice.
+
+### Current Good First Issues
+
+| Issue # | Title | Difficulty | Required Knowledge | Type | 
+|---------|-------|------------|--------------------|------|
+| #1 | Setup Development Environment | ★☆☆ (Easy) | Basic Git & Node.js | Docs |
+| #2 | Improve README.md with better screenshots | ★☆☆ (Easy) | Markdown | Docs |
+| #3 | Add missing code comments and JSDoc | ★★☆ (Medium) | TypeScript basics | Code |
+| #4 | Fix minor UI inconsistencies in invoice form | ★★☆ (Medium) | React + Tailwind | Frontend |
+| #5 | Add basic unit tests for utility functions | ★★☆ (Medium) | Jest / Testing | Testing |
+| #6 | Create issue templates for Bug Reports & Feature Requests | ★☆☆ (Easy) | Markdown + GitHub | Docs |
+| #7 | Add FUNDING.yml for community sponsorship | ★☆☆ (Easy) | YAML | Community |
+
+### How to Get Started
+
+1. Comment on the issue you'd like to work on (to avoid duplicate work)
+2. Fork the repository and create a new branch (`git checkout -b feature/issue-XXX`)
+3. Make your changes and submit a Pull Request
+4. Reference the issue in your PR description (`Closes #XXX`)
+
+> **Tip**: If you're new to open source, we highly recommend starting with documentation or setup-related issues (#1, #2, #6, #7).
+
+---
+
+**Want more options?**  
+Feel free to browse all open issues labeled **`good first issue`** or **`help wanted`** on the [Issues tab](https://github.com/onahiOMOTI/StarInvoice/issues).
+
+We welcome contributions of all kinds — code, documentation, design, testing, and ideas!
+
 ## Questions?
 
 Open a GitHub Discussion or comment on the relevant issue.
