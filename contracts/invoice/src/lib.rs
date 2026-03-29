@@ -63,6 +63,8 @@ impl InvoiceContract {
         title: String,
         description: String,
     ) -> Result<u64, ContractError> {
+        // Auth: the freelancer must sign — only the freelancer may create an invoice on their
+        // own behalf, preventing a third party from submitting invoices in someone else's name.
         freelancer.require_auth();
 
         if amount <= 0 {
@@ -113,6 +115,8 @@ impl InvoiceContract {
     pub fn fund_invoice(env: Env, invoice_id: u64, token_address: Address) -> Result<(), ContractError> {
         let invoice = storage::get_invoice(&env, invoice_id)?;
 
+        // Auth: the client must sign — only the client named on the invoice is permitted to
+        // deposit funds, preventing unauthorized parties from locking tokens into escrow.
         invoice.client.require_auth();
 
         if !validate_transition(&invoice.status, &InvoiceStatus::Funded) {
@@ -135,6 +139,8 @@ impl InvoiceContract {
     pub fn mark_delivered(env: Env, invoice_id: u64) -> Result<(), ContractError> {
         let invoice = storage::get_invoice(&env, invoice_id)?;
 
+        // Auth: the freelancer must sign — only the freelancer assigned to the invoice may
+        // declare work as delivered, preventing the client from falsely triggering delivery.
         invoice.freelancer.require_auth();
 
         if !validate_transition(&invoice.status, &InvoiceStatus::Delivered) {
@@ -150,6 +156,8 @@ impl InvoiceContract {
     pub fn approve_payment(env: Env, invoice_id: u64) -> Result<(), ContractError> {
         let invoice = storage::get_invoice(&env, invoice_id)?;
 
+        // Auth: the client must sign — only the client named on the invoice can approve
+        // delivery, as they are the counterparty who decides whether work meets expectations.
         invoice.client.require_auth();
 
         if !validate_transition(&invoice.status, &InvoiceStatus::Approved) {
@@ -163,6 +171,8 @@ impl InvoiceContract {
 
     /// Cancels a Pending or Funded invoice, voiding it permanently.
     pub fn cancel_invoice(env: Env, invoice_id: u64, caller: Address) -> Result<(), ContractError> {
+        // Auth: the caller (freelancer or client) must sign. The subsequent party-membership
+        // check ensures only the two invoice parties can cancel, not arbitrary addresses.
         caller.require_auth();
 
         let invoice = storage::get_invoice(&env, invoice_id)?;
@@ -181,6 +191,13 @@ impl InvoiceContract {
     }
 
     /// Releases escrowed funds to the freelancer once the invoice is approved.
+    ///
+    /// # Auth audit note
+    /// `release_payment` currently has **no `require_auth` call**. Any account can trigger a
+    /// release once the invoice reaches `Approved`. This is low-risk because funds always flow
+    /// to the freelancer recorded on the invoice (never to the caller), but it is still a
+    /// permissionless action. A follow-up issue should restrict this to the freelancer or the
+    /// client so that third parties cannot finalise invoices on behalf of the parties.
     pub fn release_payment(env: Env, invoice_id: u64, token_address: Address) -> Result<(), ContractError> {
         let mut invoice = storage::get_invoice(&env, invoice_id)?;
 
