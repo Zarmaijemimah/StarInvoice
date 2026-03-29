@@ -28,7 +28,7 @@ pub fn create_invoice(
         panic_with_error!(env, ContractError::InvalidParties);
     }
 
-    if description.len() > MAX_DESCRIPTION_LEN.try_into().unwrap() {
+    if description.len() > MAX_DESCRIPTION_LEN {
         panic_with_error!(env, ContractError::DescriptionTooLong);
     }
 
@@ -63,6 +63,10 @@ pub fn fund_invoice(env: &Env, invoice_id: u64, token_address: Address) -> Resul
 
     if token_address != invoice.token {
         panic_with_error!(env, ContractError::TokenMismatch);
+    }
+
+    if invoice.deadline > 0 && env.ledger().timestamp() > invoice.deadline {
+        panic_with_error!(env, ContractError::InvoiceExpired);
     }
 
     let token_client = token::Client::new(env, &invoice.token);
@@ -146,5 +150,23 @@ pub fn dispute_invoice(env: &Env, invoice_id: u64) -> Result<(), ContractError> 
 
     storage::update_invoice_status(env, invoice_id, InvoiceStatus::Disputed);
     events::invoice_disputed(env, invoice_id, &invoice.client);
+    Ok(())
+}
+
+pub fn resolve_dispute(env: &Env, invoice_id: u64, winner: Address) -> Result<(), ContractError> {
+    let admin = storage::get_admin(env)?;
+    admin.require_auth();
+
+    let mut invoice = storage::get_invoice(env, invoice_id)?;
+
+    if invoice.status != InvoiceStatus::Disputed {
+        panic_with_error!(env, ContractError::InvalidInvoiceStatus);
+    }
+
+    let token_client = token::Client::new(env, &invoice.token);
+    token_client.transfer(&env.current_contract_address(), &winner, &invoice.amount);
+
+    invoice.status = InvoiceStatus::Completed;
+    storage::save_invoice(env, &invoice);
     Ok(())
 }
