@@ -1,0 +1,25 @@
+# .github/DISCUSSION_TEMPLATE/config.yml
+# Configuration for GitHub Discussions in StarInvoice
+
+blank_issues_enabled: false
+contact_links:
+  - name: GitHub Discussions
+    url: https://github.com/onahiOMOTI/StarInvoice/discussions
+    about: Please ask and answer questions here.
+
+categories:
+  - name: Q&A
+    description: Ask questions and get help from the community
+    labels: ["question"]
+  
+  - name: Ideas
+    description: Share ideas and feature requests for StarInvoice
+    labels: ["enhancement"]
+  
+  - name: Show and Tell
+    description: Show your invoices, templates, or integrations built with StarInvoice
+    labels: ["show-and-tell"]
+  
+  - name: General
+    description: General discussion about the project
+    labels: []

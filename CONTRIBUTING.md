@@ -88,6 +88,19 @@ Feel free to browse all open issues labeled **`good first issue`** or **`help wa
 
 We welcome contributions of all kinds — code, documentation, design, testing, and ideas!
 
-## Questions?
 
-Open a GitHub Discussion or comment on the relevant issue.
+## Questions & Community Discussions
+
+Have a question? Need help? Want to share an idea?
+
+We use **GitHub Discussions** for all community conversations.
+
+→ **[Go to Discussions](https://github.com/onahiOMOTI/StarInvoice/discussions)**
+
+### Available Categories:
+- **Q&A** — Ask questions and get help
+- **Ideas** — Suggest new features or improvements
+- **Show and Tell** — Share what you've built with StarInvoice
+- **General** — Anything else related to the project
+
+**Please do not open issues for questions.** Use Discussions instead — this helps keep the issue tracker clean for bugs and feature requests.
