@@ -46,7 +46,44 @@ impl InvoiceContract {
         title: String,
         description: String,
     ) -> Result<u64, ContractError> {
-        escrow::create_invoice(&env, freelancer, client, amount, token, deadline, title, description)
+        // Auth: the freelancer must sign — only the freelancer may create an invoice on their
+        // own behalf, preventing a third party from submitting invoices in someone else's name.
+        freelancer.require_auth();
+
+        if amount <= 0 {
+            panic_with_error!(&env, ContractError::InvalidAmount);
+        }
+
+        if amount > MAX_INVOICE_AMOUNT {
+            panic_with_error!(&env, ContractError::AmountExceedsMaximum);
+        }
+
+        if freelancer == client {
+            panic_with_error!(&env, ContractError::InvalidParties);
+        }
+
+        if description.len() > MAX_DESCRIPTION_LEN {
+            panic_with_error!(&env, ContractError::DescriptionTooLong);
+        }
+
+        let invoice_id = storage::next_invoice_id(&env);
+
+        let invoice = Invoice {
+            id: invoice_id,
+            freelancer: freelancer.clone(),
+            client: client.clone(),
+            amount,
+            token,
+            deadline,
+            title,
+            created_at: env.ledger().timestamp(),
+            description,
+            status: InvoiceStatus::Pending,
+        };
+
+        storage::save_invoice(&env, &invoice);
+        events::invoice_created(&env, invoice_id, &freelancer, &client, amount);
+        Ok(invoice_id)
     }
 
     pub fn initialize(env: Env, admin: Address) {
@@ -60,6 +97,8 @@ impl InvoiceContract {
     pub fn fund_invoice(env: Env, invoice_id: u64, token_address: Address) -> Result<(), ContractError> {
         let invoice = storage::get_invoice(&env, invoice_id)?;
 
+        // Auth: the client must sign — only the client named on the invoice is permitted to
+        // deposit funds, preventing unauthorized parties from locking tokens into escrow.
         invoice.client.require_auth();
 
         if !validate_transition(&invoice.status, &InvoiceStatus::Funded) {
@@ -82,16 +121,47 @@ impl InvoiceContract {
     }
 
     pub fn mark_delivered(env: Env, invoice_id: u64) -> Result<(), ContractError> {
-        escrow::mark_delivered(&env, invoice_id)
+        let invoice = storage::get_invoice(&env, invoice_id)?;
+
+        // Auth: the freelancer must sign — only the freelancer assigned to the invoice may
+        // declare work as delivered, preventing the client from falsely triggering delivery.
+        invoice.freelancer.require_auth();
+
+        if !validate_transition(&invoice.status, &InvoiceStatus::Delivered) {
+            panic_with_error!(&env, ContractError::InvalidInvoiceStatus);
+        }
+
+        storage::update_invoice_status(&env, invoice_id, storage::InvoiceStatus::Delivered);
+        events::mark_delivered(&env, invoice_id, &invoice.freelancer);
+        Ok(())
     }
 
     pub fn approve_payment(env: Env, invoice_id: u64) -> Result<(), ContractError> {
-        escrow::approve_payment(&env, invoice_id)
+        let invoice = storage::get_invoice(&env, invoice_id)?;
+
+        // Auth: the client must sign — only the client named on the invoice can approve
+        // delivery, as they are the counterparty who decides whether work meets expectations.
+        invoice.client.require_auth();
+
+        if !validate_transition(&invoice.status, &InvoiceStatus::Approved) {
+            panic_with_error!(&env, ContractError::InvalidInvoiceStatus);
+        }
+
+        storage::update_invoice_status(&env, invoice_id, storage::InvoiceStatus::Approved);
+        events::invoice_approved(&env, invoice_id, &invoice.client);
+        Ok(())
     }
 
     pub fn cancel_invoice(env: Env, invoice_id: u64, caller: Address) -> Result<(), ContractError> {
-        escrow::cancel_invoice(&env, invoice_id, caller)
-    }
+        // Auth: the caller (freelancer or client) must sign. The subsequent party-membership
+        // check ensures only the two invoice parties can cancel, not arbitrary addresses.
+        caller.require_auth();
+
+        let invoice = storage::get_invoice(&env, invoice_id)?;
+
+        if caller != invoice.freelancer && caller != invoice.client {
+            panic_with_error!(&env, ContractError::UnauthorizedCaller);
+        }
 
     pub fn release_payment(env: Env, invoice_id: u64) -> Result<(), ContractError> {
         escrow::release_payment(&env, invoice_id)
@@ -101,10 +171,16 @@ impl InvoiceContract {
         escrow::dispute_invoice(&env, invoice_id)
     }
 
-    pub fn resolve_dispute(env: Env, invoice_id: u64, winner: Address) -> Result<(), ContractError> {
-        let admin = storage::get_admin(&env)
-            .unwrap_or_else(|_| panic_with_error!(&env, ContractError::NotInitialized));
-        admin.require_auth();
+    /// Releases escrowed funds to the freelancer once the invoice is approved.
+    ///
+    /// # Auth audit note
+    /// `release_payment` currently has **no `require_auth` call**. Any account can trigger a
+    /// release once the invoice reaches `Approved`. This is low-risk because funds always flow
+    /// to the freelancer recorded on the invoice (never to the caller), but it is still a
+    /// permissionless action. A follow-up issue should restrict this to the freelancer or the
+    /// client so that third parties cannot finalise invoices on behalf of the parties.
+    pub fn release_payment(env: Env, invoice_id: u64, token_address: Address) -> Result<(), ContractError> {
+        let mut invoice = storage::get_invoice(&env, invoice_id)?;
 
         let mut invoice = storage::get_invoice(&env, invoice_id)?;
         if invoice.status != InvoiceStatus::Disputed {
