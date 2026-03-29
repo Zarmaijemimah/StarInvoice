@@ -104,7 +104,7 @@ enum DataKey {
 /// The total number of invoices created, or 0 if none exist.
 pub fn get_invoice_count(env: &Env) -> u64 {
     env.storage()
-        .instance()
+        .persistent()
         .get(&DataKey::InvoiceCount)
         .unwrap_or(0)
 }
@@ -229,23 +229,5 @@ pub fn get_admin(env: &Env) -> Result<Address, ContractError> {
 /// Sets the admin address.
 pub fn set_admin(env: &Env, admin: &Address) {
     env.storage().instance().set(&DataKey::Admin, admin);
-}
-
-/// Retrieves a dispute by invoice ID, returning an error if not found.
-pub fn get_dispute(env: &Env, invoice_id: u64) -> Result<Dispute, ContractError> {
-    let key = DataKey::Dispute(invoice_id);
-    env.storage()
-        .persistent()
-        .get(&key)
-        .ok_or(ContractError::DisputeNotFound)
-}
-
-/// Creates or updates a dispute for the given invoice.
-pub fn save_dispute(env: &Env, dispute: &Dispute) {
-    let key = DataKey::Dispute(dispute.invoice_id);
-    env.storage().persistent().set(&key, dispute);
-    env.storage()
-        .persistent()
-        .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
 }
 

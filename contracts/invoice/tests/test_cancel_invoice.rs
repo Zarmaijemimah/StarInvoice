@@ -26,11 +26,10 @@ mod tests {
         token_address: &Address,
         amount: i128,
     ) -> u64 {
+        let title = String::from_str(env, "Test");
         let description = String::from_str(env, "Test invoice");
-        contract_client.create_invoice(freelancer, client, &amount, token_address, &9999999999, &description)
+        contract_client.create_invoice(freelancer, client, &amount, token_address, &9999999999, &title, &description)
     }
-
-    // --- cancel_invoice tests ---
 
     #[test]
     fn test_cancel_invoice_by_freelancer() {
@@ -77,10 +76,8 @@ mod tests {
         let (freelancer, client, token_address, amount) = setup(&env);
         let invoice_id = create_pending_invoice(&env, &contract_client, &freelancer, &client, &token_address, amount);
 
-        // Fund the invoice first
-        contract_client.fund_invoice(&invoice_id);
+        contract_client.fund_invoice(&invoice_id, &token_address);
 
-        // Cancelling a Funded invoice must be rejected
         let result = contract_client.try_cancel_invoice(&invoice_id, &freelancer);
         assert!(result.is_err());
     }
@@ -112,10 +109,8 @@ mod tests {
         let (freelancer, client, token_address, amount) = setup(&env);
         let invoice_id = create_pending_invoice(&env, &contract_client, &freelancer, &client, &token_address, amount);
 
-        // Cancel once — succeeds
         contract_client.cancel_invoice(&invoice_id, &freelancer);
 
-        // Cancel again from Cancelled status — must fail
         let result = contract_client.try_cancel_invoice(&invoice_id, &freelancer);
         assert!(result.is_err());
     }
@@ -135,8 +130,6 @@ mod tests {
         let result = contract_client.try_cancel_invoice(&invoice_id, &unrelated);
         assert!(result.is_err());
     }
-
-    // --- validate_transition unit tests ---
 
     #[test]
     fn test_valid_transitions() {

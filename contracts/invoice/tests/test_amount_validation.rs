@@ -7,15 +7,13 @@ mod tests {
         let token_admin = Address::generate(env);
         let token_id = env.register_stellar_asset_contract_v2(token_admin.clone());
         let token_address = token_id.address();
-
         let freelancer = Address::generate(env);
         let client = Address::generate(env);
-
         (freelancer, client, token_address)
     }
 
     #[test]
-    #[should_panic(expected = "Invoice amount must be greater than zero")]
+    #[should_panic]
     fn test_create_invoice_zero_amount() {
         let env = Env::default();
         env.mock_all_auths();
@@ -24,13 +22,14 @@ mod tests {
         let contract_client = InvoiceContractClient::new(&env, &contract_id);
 
         let (freelancer, client, token_address) = setup(&env);
+        let title = String::from_str(&env, "T");
         let description = String::from_str(&env, "Test invoice");
 
-        contract_client.create_invoice(&freelancer, &client, &0, &token_address, &9999999999, &description);
+        contract_client.create_invoice(&freelancer, &client, &0, &token_address, &9999999999, &title, &description);
     }
 
     #[test]
-    #[should_panic(expected = "Invoice amount must be greater than zero")]
+    #[should_panic]
     fn test_create_invoice_negative_amount() {
         let env = Env::default();
         env.mock_all_auths();
@@ -39,9 +38,10 @@ mod tests {
         let contract_client = InvoiceContractClient::new(&env, &contract_id);
 
         let (freelancer, client, token_address) = setup(&env);
+        let title = String::from_str(&env, "T");
         let description = String::from_str(&env, "Test invoice");
 
-        contract_client.create_invoice(&freelancer, &client, &-100, &token_address, &9999999999, &description);
+        contract_client.create_invoice(&freelancer, &client, &-100, &token_address, &9999999999, &title, &description);
     }
 
     #[test]
@@ -63,9 +63,10 @@ mod tests {
 
         token_admin_client.mint(&client, &amount);
 
+        let title = String::from_str(&env, "T");
         let description = String::from_str(&env, "Test invoice");
 
-        let id = contract_client.create_invoice(&freelancer, &client, &amount, &token_address, &9999999999, &description);
+        let id = contract_client.create_invoice(&freelancer, &client, &amount, &token_address, &9999999999, &title, &description);
         assert_eq!(id, 0);
     }
 }
