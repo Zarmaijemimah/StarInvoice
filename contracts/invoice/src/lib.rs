@@ -7,7 +7,8 @@ mod events;
 mod storage;
 mod views;
 
-use soroban_sdk::{contract, contractimpl, contractmeta, panic_with_error, Address, Env, String};
+use crate::constants::*;
+use soroban_sdk::{contract, contractimpl, contractmeta, panic_with_error, token, Address, Env, String};
 
 contractmeta!(key = "Description", val = "StarInvoice escrow contract");
 contractmeta!(key = "Version", val = "0.1.0");
@@ -55,12 +56,26 @@ impl InvoiceContract {
         storage::set_admin(&env, &admin);
     }
 
-    pub fn set_admin(env: Env, new_admin: Address) {
-        let admin = storage::get_admin(&env)
-            .unwrap_or_else(|_| panic_with_error!(&env, ContractError::NotInitialized));
-        admin.require_auth();
-        storage::set_admin(&env, &new_admin);
-    }
+    /// Allows the client to deposit funds into escrow for the given invoice.
+    pub fn fund_invoice(env: Env, invoice_id: u64, token_address: Address) -> Result<(), ContractError> {
+        let invoice = storage::get_invoice(&env, invoice_id)?;
+
+        invoice.client.require_auth();
+
+        if !validate_transition(&invoice.status, &InvoiceStatus::Funded) {
+            panic_with_error!(&env, ContractError::InvalidInvoiceStatus);
+        }
+
+        if invoice.deadline > 0 && env.ledger().timestamp() > invoice.deadline {
+            panic_with_error!(&env, ContractError::InvoiceExpired);
+        }
+
+        if token_address != invoice.token {
+            panic_with_error!(&env, ContractError::TokenMismatch);
+        }
+
+        let token_client = token::Client::new(&env, &invoice.token);
+        token_client.transfer(&invoice.client, &env.current_contract_address(), &invoice.amount);
 
     pub fn fund_invoice(env: Env, invoice_id: u64, token_address: Address) -> Result<(), ContractError> {
         escrow::fund_invoice(&env, invoice_id, token_address)
