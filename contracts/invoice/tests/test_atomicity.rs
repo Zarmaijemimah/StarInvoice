@@ -27,24 +27,25 @@ mod tests {
         let contract_client = InvoiceContractClient::new(&env, &contract_id);
 
         let (freelancer, client, token_address, amount) = setup(&env);
+        let title = String::from_str(&env, "T");
         let description = String::from_str(&env, "Test invoice");
 
         let mut ids = Vec::new();
         for _ in 0..10 {
-            let id = contract_client.create_invoice(&freelancer, &client, &amount, &token_address, &9999999999, &description);
+            let id = contract_client.create_invoice(
+                &freelancer, &client, &amount, &token_address, &9999999999, &title, &description,
+            );
             ids.push(id);
         }
 
-        // Verify all IDs are unique
         for i in 0..ids.len() {
             for j in (i + 1)..ids.len() {
                 assert_ne!(ids[i], ids[j], "Invoice IDs must be unique");
             }
         }
 
-        // Verify IDs are sequential
-        for i in 0..ids.len() {
-            assert_eq!(ids[i], i as u64, "Invoice IDs should be sequential starting from 0");
+        for (i, &id) in ids.iter().enumerate() {
+            assert_eq!(id, i as u64, "Invoice IDs should be sequential starting from 0");
         }
     }
 }
