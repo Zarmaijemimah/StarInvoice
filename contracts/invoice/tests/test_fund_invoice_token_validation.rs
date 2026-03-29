@@ -31,17 +31,15 @@ mod tests {
             &token,
             &9999999999,
             &String::from_str(&env, "Test Invoice"),
+            &String::from_str(&env, "Test Invoice"),
         );
 
-        // Fund with the correct token - should succeed
         let result = c.try_fund_invoice(&invoice_id, &token);
         assert!(result.is_ok());
 
-        // Verify invoice status is now Funded
         let invoice = c.get_invoice(&invoice_id);
         assert_eq!(invoice.status, InvoiceStatus::Funded);
 
-        // Verify funds were transferred to the contract
         let token_client = token::Client::new(&env, &token);
         assert_eq!(token_client.balance(&contract_id), amount);
     }
@@ -55,7 +53,6 @@ mod tests {
         let c = InvoiceContractClient::new(&env, &contract_id);
         let (freelancer, client, token, amount) = setup(&env);
 
-        // Create a second token for the mismatch test
         let token_admin_2 = Address::generate(&env);
         let wrong_token = env
             .register_stellar_asset_contract_v2(token_admin_2)
@@ -68,9 +65,9 @@ mod tests {
             &token,
             &9999999999,
             &String::from_str(&env, "Test Invoice"),
+            &String::from_str(&env, "Test Invoice"),
         );
 
-        // Try to fund with a different token - should fail
         let result = c.try_fund_invoice(&invoice_id, &wrong_token);
         assert!(result.is_err());
         assert_eq!(
@@ -79,11 +76,9 @@ mod tests {
             "Expected TokenMismatch error when funding with incorrect token"
         );
 
-        // Verify invoice status is still Pending
         let invoice = c.get_invoice(&invoice_id);
         assert_eq!(invoice.status, InvoiceStatus::Pending);
 
-        // Verify funds were NOT transferred to the contract
         let token_client = token::Client::new(&env, &token);
         assert_eq!(token_client.balance(&contract_id), 0);
     }
@@ -97,7 +92,6 @@ mod tests {
         let c = InvoiceContractClient::new(&env, &contract_id);
         let (freelancer, client, token, amount) = setup(&env);
 
-        // Create a second token for the mismatch test
         let token_admin_2 = Address::generate(&env);
         let wrong_token = env
             .register_stellar_asset_contract_v2(token_admin_2)
@@ -110,13 +104,12 @@ mod tests {
             &token,
             &9999999999,
             &String::from_str(&env, "Test Invoice"),
+            &String::from_str(&env, "Test Invoice"),
         );
 
-        // Attempt to fund with wrong token
         let result = c.try_fund_invoice(&invoice_id, &wrong_token);
         assert!(result.is_err());
 
-        // Verify that after the failed attempt, the invoice can still be funded with correct token
         let result = c.try_fund_invoice(&invoice_id, &token);
         assert!(result.is_ok());
 

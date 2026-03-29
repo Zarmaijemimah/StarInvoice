@@ -32,12 +32,12 @@ mod tests {
             token,
             &9999999999,
             &String::from_str(env, "Test"),
+            &String::from_str(env, "Test"),
         );
-        client.fund_invoice(&id);
+        client.fund_invoice(&id, token);
         id
     }
 
-    /// fund_invoice on an already-Funded invoice must fail.
     #[test]
     fn test_fund_invoice_already_funded() {
         let env = Env::default();
@@ -49,7 +49,7 @@ mod tests {
 
         let id = create_funded_invoice(&env, &c, &freelancer, &client, &token, amount);
 
-        let result = c.try_fund_invoice(&id);
+        let result = c.try_fund_invoice(&id, &token);
         assert_eq!(
             result,
             Err(Ok(ContractError::InvalidInvoiceStatus)),
@@ -57,7 +57,6 @@ mod tests {
         );
     }
 
-    /// mark_delivered on a Pending (unfunded) invoice must fail.
     #[test]
     fn test_mark_delivered_on_pending_invoice() {
         let env = Env::default();
@@ -74,6 +73,7 @@ mod tests {
             &token,
             &9999999999,
             &String::from_str(&env, "Test"),
+            &String::from_str(&env, "Test"),
         );
 
         let result = c.try_mark_delivered(&id);
@@ -84,7 +84,6 @@ mod tests {
         );
     }
 
-    /// approve_payment on a Funded (not yet Delivered) invoice must fail.
     #[test]
     fn test_approve_payment_on_funded_invoice() {
         let env = Env::default();
@@ -104,7 +103,6 @@ mod tests {
         );
     }
 
-    /// release_payment on a Delivered (not yet Approved) invoice must fail.
     #[test]
     fn test_release_payment_on_delivered_invoice() {
         let env = Env::default();

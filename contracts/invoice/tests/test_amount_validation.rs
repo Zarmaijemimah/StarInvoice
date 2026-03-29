@@ -7,10 +7,8 @@ mod tests {
         let token_admin = Address::generate(env);
         let token_id = env.register_stellar_asset_contract_v2(token_admin.clone());
         let token_address = token_id.address();
-
         let freelancer = Address::generate(env);
         let client = Address::generate(env);
-
         (freelancer, client, token_address)
     }
 
