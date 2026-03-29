@@ -3,7 +3,7 @@
 help:
 	@echo "StarInvoice Development Commands"
 	@echo "================================"
-	@echo "make build    - Compile contract to wasm32-unknown-unknown --release"
+	@echo "make build    - Compile contract to wasm32-unknown-unknown --release and optimize WASM"
 	@echo "make test     - Run all tests"
 	@echo "make fmt      - Format code with cargo fmt"
 	@echo "make lint     - Run cargo clippy with strict warnings"
@@ -11,6 +11,7 @@ help:
 
 build:
 	cargo build --target wasm32-unknown-unknown --release
+	soroban contract optimize --wasm target/wasm32-unknown-unknown/release/star_invoice.wasm
 
 test:
 	cargo test

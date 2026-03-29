@@ -25,6 +25,8 @@ pub enum ContractError {
     InvalidAmount = 9,
     /// The freelancer and client must be different addresses.
     InvalidParties = 10,
+    /// The invoice deadline has passed and it can no longer be funded.
+    InvoiceExpired = 11,
 }
 
 /// Represents the lifecycle state of an invoice.
