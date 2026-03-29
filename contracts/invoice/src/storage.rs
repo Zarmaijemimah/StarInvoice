@@ -1,5 +1,5 @@
 use soroban_sdk::{contracterror, contracttype, Address, Env, String};
-use crate::constants::{TTL_THRESHOLD, TTL_EXTEND_TO, MAX_DESCRIPTION_LEN};
+use crate::constants::*;
 
 /// Contract-level errors returned by state-changing functions.
 #[contracterror]
