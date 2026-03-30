@@ -270,6 +270,10 @@ Check out our **[Good First Issues](https://github.com/onahiOMOTI/StarInvoice/is
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+## Indexing Events
+
+StarInvoice emits a contract event at every state transition. See [docs/indexing-events.md](./docs/indexing-events.md) for the full event topic structure and TypeScript examples for subscribing via Soroban RPC or building a custom off-chain indexer.
+
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for how to get involved.
