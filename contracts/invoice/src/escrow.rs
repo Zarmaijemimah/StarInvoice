@@ -1,5 +1,6 @@
 use soroban_sdk::{panic_with_error, token, Address, Env, String};
 
+#[allow(clippy::wildcard_imports)] // constants module is a flat list of pub consts
 use crate::constants::*;
 use crate::storage::{self, ContractError, InvoiceStatus};
 use crate::{events, validate_transition, Invoice};
