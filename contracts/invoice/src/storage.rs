@@ -51,7 +51,7 @@ pub enum InvoiceStatus {
 
 /// Core invoice data structure stored on-chain.
 #[contracttype]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Invoice {
     /// Unique numeric identifier for this invoice.
     pub id: u64,
