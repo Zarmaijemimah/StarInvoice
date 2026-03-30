@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use soroban_sdk::{testutils::Address as _, token, Address, Env, String};
+    use soroban_sdk::{testutils::{Address as _, Ledger}, token, Address, Env, String};
     use star_invoice::{ContractError, InvoiceContract, InvoiceContractClient};
 
     fn setup(env: &Env) -> (Address, Address, Address, i128) {

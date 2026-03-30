@@ -26,12 +26,14 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
+      - name: Install system dependencies
+        run: sudo apt-get install -y libdbus-1-dev pkg-config
       - name: Install Soroban CLI
-        run: cargo install --locked soroban-cli
+        run: cargo install --locked stellar-cli
       - name: Build WASM
         run: cargo build --target wasm32-unknown-unknown --release
       - name: Optimize WASM
-        run: soroban contract optimize --wasm target/wasm32-unknown-unknown/release/star_invoice.wasm
+        run: stellar contract optimize --wasm target/wasm32-unknown-unknown/release/star_invoice.wasm
 
   clippy:
     runs-on: ubuntu-latest
@@ -41,12 +43,13 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo clippy --all-targets -- -D warnings -W clippy::pedantic
 
   audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: rustsec/audit-check-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install --locked cargo-audit
+      - run: cargo audit

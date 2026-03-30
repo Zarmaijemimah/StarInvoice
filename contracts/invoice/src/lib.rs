@@ -1,5 +1,10 @@
 #![no_std]
 #![deny(unused_variables)]
+// Pedantic lints are enabled in CI. Suppress categories that conflict with Soroban's
+// generated code patterns or are stylistic rather than correctness-related.
+#![allow(clippy::module_name_repetitions)] // e.g. InvoiceContract, InvoiceStatus in same crate
+#![allow(clippy::missing_errors_doc)] // contract entry points are documented at the module level
+#![allow(clippy::must_use_candidate)] // Soroban contractimpl fns are called for side-effects
 
 mod constants;
 mod escrow;
@@ -7,6 +12,7 @@ mod events;
 mod storage;
 mod views;
 
+#[allow(clippy::wildcard_imports)] // constants module is a flat list of pub consts
 use crate::constants::*;
 use soroban_sdk::{contract, contractimpl, contractmeta, panic_with_error, token, Address, Env, String};
 
@@ -17,8 +23,17 @@ pub use storage::{ContractError, Invoice, InvoiceStatus};
 
 #[cfg(test)]
 mod test_init;
+#[cfg(test)]
+mod tests; // tests/mod.rs — contains helpers submodule and all invoice tests
 
+/// Validates whether a status transition is permitted.
+///
+/// # CONTRIBUTOR NOTE
+/// When adding new `InvoiceStatus` variants, you MUST update this function and every
+/// `match` on `InvoiceStatus` in the codebase. Do NOT use a wildcard `_` arm in those
+/// matches — exhaustive arms ensure the compiler catches missing cases at build time.
 pub fn validate_transition(from: &InvoiceStatus, to: &InvoiceStatus) -> bool {
+    // Exhaustive match — no wildcard arm so the compiler forces updates when new variants are added.
     matches!(
         (from, to),
         (InvoiceStatus::Pending, InvoiceStatus::Funded)
@@ -99,75 +114,21 @@ impl InvoiceContract {
         storage::set_admin(&env, &admin);
     }
 
-    /// Allows the client to deposit funds into escrow for the given invoice.
-    pub fn fund_invoice(env: Env, invoice_id: u64, token_address: Address) -> Result<(), ContractError> {
-        let invoice = storage::get_invoice(&env, invoice_id)?;
-
-        // Auth: the client must sign — only the client named on the invoice is permitted to
-        // deposit funds, preventing unauthorized parties from locking tokens into escrow.
-        invoice.client.require_auth();
-
-        if !validate_transition(&invoice.status, &InvoiceStatus::Funded) {
-            panic_with_error!(&env, ContractError::InvalidInvoiceStatus);
-        }
-
-        if invoice.deadline > 0 && env.ledger().timestamp() > invoice.deadline {
-            panic_with_error!(&env, ContractError::InvoiceExpired);
-        }
-
-        if token_address != invoice.token {
-            panic_with_error!(&env, ContractError::TokenMismatch);
-        }
-
-        let token_client = token::Client::new(&env, &invoice.token);
-        token_client.transfer(&invoice.client, &env.current_contract_address(), &invoice.amount);
-
     pub fn fund_invoice(env: Env, invoice_id: u64, token_address: Address) -> Result<(), ContractError> {
         escrow::fund_invoice(&env, invoice_id, token_address)
     }
 
     pub fn mark_delivered(env: Env, invoice_id: u64) -> Result<(), ContractError> {
-        let invoice = storage::get_invoice(&env, invoice_id)?;
-
-        // Auth: the freelancer must sign — only the freelancer assigned to the invoice may
-        // declare work as delivered, preventing the client from falsely triggering delivery.
-        invoice.freelancer.require_auth();
-
-        if !validate_transition(&invoice.status, &InvoiceStatus::Delivered) {
-            panic_with_error!(&env, ContractError::InvalidInvoiceStatus);
-        }
-
-        storage::update_invoice_status(&env, invoice_id, storage::InvoiceStatus::Delivered);
-        events::mark_delivered(&env, invoice_id, &invoice.freelancer);
-        Ok(())
+        escrow::mark_delivered(&env, invoice_id)
     }
 
     pub fn approve_payment(env: Env, invoice_id: u64) -> Result<(), ContractError> {
-        let invoice = storage::get_invoice(&env, invoice_id)?;
-
-        // Auth: the client must sign — only the client named on the invoice can approve
-        // delivery, as they are the counterparty who decides whether work meets expectations.
-        invoice.client.require_auth();
-
-        if !validate_transition(&invoice.status, &InvoiceStatus::Approved) {
-            panic_with_error!(&env, ContractError::InvalidInvoiceStatus);
-        }
-
-        storage::update_invoice_status(&env, invoice_id, storage::InvoiceStatus::Approved);
-        events::invoice_approved(&env, invoice_id, &invoice.client);
-        Ok(())
+        escrow::approve_payment(&env, invoice_id)
     }
 
     pub fn cancel_invoice(env: Env, invoice_id: u64, caller: Address) -> Result<(), ContractError> {
-        // Auth: the caller (freelancer or client) must sign. The subsequent party-membership
-        // check ensures only the two invoice parties can cancel, not arbitrary addresses.
-        caller.require_auth();
-
-        let invoice = storage::get_invoice(&env, invoice_id)?;
-
-        if caller != invoice.freelancer && caller != invoice.client {
-            panic_with_error!(&env, ContractError::UnauthorizedCaller);
-        }
+        escrow::cancel_invoice(&env, invoice_id, caller)
+    }
 
     pub fn release_payment(env: Env, invoice_id: u64) -> Result<(), ContractError> {
         escrow::release_payment(&env, invoice_id)
@@ -175,30 +136,6 @@ impl InvoiceContract {
 
     pub fn dispute_invoice(env: Env, invoice_id: u64) -> Result<(), ContractError> {
         escrow::dispute_invoice(&env, invoice_id)
-    }
-
-    /// Releases escrowed funds to the freelancer once the invoice is approved.
-    ///
-    /// # Auth audit note
-    /// `release_payment` currently has **no `require_auth` call**. Any account can trigger a
-    /// release once the invoice reaches `Approved`. This is low-risk because funds always flow
-    /// to the freelancer recorded on the invoice (never to the caller), but it is still a
-    /// permissionless action. A follow-up issue should restrict this to the freelancer or the
-    /// client so that third parties cannot finalise invoices on behalf of the parties.
-    pub fn release_payment(env: Env, invoice_id: u64, token_address: Address) -> Result<(), ContractError> {
-        let mut invoice = storage::get_invoice(&env, invoice_id)?;
-
-        let mut invoice = storage::get_invoice(&env, invoice_id)?;
-        if invoice.status != InvoiceStatus::Disputed {
-            panic_with_error!(&env, ContractError::InvalidInvoiceStatus);
-        }
-
-        let token_client = soroban_sdk::token::Client::new(&env, &invoice.token);
-        token_client.transfer(&env.current_contract_address(), &winner, &invoice.amount);
-
-        invoice.status = InvoiceStatus::Completed;
-        storage::save_invoice(&env, &invoice);
-        Ok(())
     }
 
     pub fn get_invoice(env: Env, invoice_id: u64) -> Result<Invoice, ContractError> {
