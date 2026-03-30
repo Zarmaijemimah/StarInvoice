@@ -31,6 +31,7 @@ mod tests {
             &9999999999,
             &String::from_str(env, "Test"),
             &String::from_str(env, "Test"),
+            &String::from_str(env, ""),
         );
         c.fund_invoice(&id, token);
         c.mark_delivered(&id);
@@ -93,6 +94,7 @@ mod tests {
             &9999999999,
             &String::from_str(&env, "Test"),
             &String::from_str(&env, "Test"),
+            &String::from_str(&env, ""),
         );
         c.fund_invoice(&id, &token);
 

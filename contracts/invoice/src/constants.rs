@@ -12,3 +12,7 @@ pub const MAX_DESCRIPTION_LEN: u32 = 256;
 /// Maximum allowed invoice amount to prevent excessively large values.
 /// Set to 10 billion stroops (0.1 billion units of the base token).
 pub const MAX_INVOICE_AMOUNT: i128 = 10_000_000_000_000;
+
+/// Maximum length of metadata URI in bytes.
+/// Used for storing links to off-chain invoice details (PDF, IPFS hash, etc.).
+pub const MAX_METADATA_URI_LEN: u32 = 512;

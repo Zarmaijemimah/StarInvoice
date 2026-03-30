@@ -29,11 +29,12 @@ mod tests {
         let (freelancer, client, token_address, amount) = setup(&env);
         let title = String::from_str(&env, "T");
         let description = String::from_str(&env, "Test invoice");
+        let metadata_uri = String::from_str(&env, "");
 
         let mut ids = Vec::new();
         for _ in 0..10 {
             let id = contract_client.create_invoice(
-                &freelancer, &client, &amount, &token_address, &9999999999, &title, &description,
+                &freelancer, &client, &amount, &token_address, &9999999999, &title, &description, &metadata_uri,
             );
             ids.push(id);
         }

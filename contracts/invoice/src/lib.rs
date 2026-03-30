@@ -45,6 +45,7 @@ impl InvoiceContract {
         deadline: u64,
         title: String,
         description: String,
+        metadata_uri: String,
     ) -> Result<u64, ContractError> {
         // Auth: the freelancer must sign — only the freelancer may create an invoice on their
         // own behalf, preventing a third party from submitting invoices in someone else's name.
@@ -66,6 +67,10 @@ impl InvoiceContract {
             panic_with_error!(&env, ContractError::DescriptionTooLong);
         }
 
+        if metadata_uri.len() > MAX_METADATA_URI_LEN {
+            panic_with_error!(&env, ContractError::MetadataUriTooLong);
+        }
+
         let invoice_id = storage::next_invoice_id(&env);
 
         let invoice = Invoice {
@@ -79,6 +84,7 @@ impl InvoiceContract {
             created_at: env.ledger().timestamp(),
             description,
             status: InvoiceStatus::Pending,
+            metadata_uri,
         };
 
         storage::save_invoice(&env, &invoice);
@@ -235,6 +241,7 @@ mod tests {
     ) -> (u64, Address) {
         let title = String::from_str(env, "Test Invoice");
         let description = String::from_str(env, "Test description");
+        let metadata_uri = String::from_str(env, "");
         let token_address = setup_token(env, payer, amount);
         let invoice_id = client.create_invoice(
             freelancer,
@@ -244,6 +251,7 @@ mod tests {
             &9_999_999_999,
             &title,
             &description,
+            &metadata_uri,
         );
         client.fund_invoice(&invoice_id, &token_address);
         (invoice_id, token_address)
@@ -261,8 +269,9 @@ mod tests {
         let token = Address::generate(&env);
         let title = String::from_str(&env, "Logo Design");
         let description = String::from_str(&env, "Logo design work");
+        let metadata_uri = String::from_str(&env, "");
 
-        let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &token, &9_999_999_999, &title, &description);
+        let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &token, &9_999_999_999, &title, &description, &metadata_uri);
         assert_eq!(invoice_id, 0);
     }
 
@@ -277,11 +286,12 @@ mod tests {
         let payer = Address::generate(&env);
         let title = String::from_str(&env, "Unique ID Test");
         let description = String::from_str(&env, "Unique ID test");
+        let metadata_uri = String::from_str(&env, "");
 
         for i in 0..5u64 {
             let invoice_id = client.create_invoice(
                 &freelancer, &payer, &1000, &Address::generate(&env),
-                &9_999_999_999, &title, &description,
+                &9_999_999_999, &title, &description, &metadata_uri,
             );
             assert_eq!(invoice_id, i);
         }
@@ -370,8 +380,9 @@ mod tests {
         let token = Address::generate(&env);
         let title = String::from_str(&env, "T");
         let description = String::from_str(&env, "D");
+        let metadata_uri = String::from_str(&env, "");
 
-        let result = client.try_create_invoice(&freelancer, &payer, &0, &token, &9_999_999_999, &title, &description);
+        let result = client.try_create_invoice(&freelancer, &payer, &0, &token, &9_999_999_999, &title, &description, &metadata_uri);
         assert_eq!(result, Err(Ok(ContractError::InvalidAmount)));
     }
 
@@ -386,8 +397,9 @@ mod tests {
         let token = Address::generate(&env);
         let title = String::from_str(&env, "T");
         let description = String::from_str(&env, "D");
+        let metadata_uri = String::from_str(&env, "");
 
-        let result = client.try_create_invoice(&freelancer, &freelancer, &1000, &token, &9_999_999_999, &title, &description);
+        let result = client.try_create_invoice(&freelancer, &freelancer, &1000, &token, &9_999_999_999, &title, &description, &metadata_uri);
         assert_eq!(result, Err(Ok(ContractError::InvalidParties)));
     }
 
@@ -403,8 +415,9 @@ mod tests {
         let token = Address::generate(&env);
         let title = String::from_str(&env, "T");
         let long_desc = String::from_str(&env, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        let metadata_uri = String::from_str(&env, "");
 
-        let result = client.try_create_invoice(&freelancer, &payer, &1000, &token, &9_999_999_999, &title, &long_desc);
+        let result = client.try_create_invoice(&freelancer, &payer, &1000, &token, &9_999_999_999, &title, &long_desc, &metadata_uri);
         assert_eq!(result, Err(Ok(ContractError::DescriptionTooLong)));
     }
 
@@ -420,8 +433,9 @@ mod tests {
         let token = Address::generate(&env);
         let title = String::from_str(&env, "T");
         let description = String::from_str(&env, "D");
+        let metadata_uri = String::from_str(&env, "");
 
-        let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &token, &9_999_999_999, &title, &description);
+        let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &token, &9_999_999_999, &title, &description, &metadata_uri);
         let result = client.try_mark_delivered(&invoice_id);
         assert_eq!(result, Err(Ok(ContractError::InvalidInvoiceStatus)));
     }
@@ -489,8 +503,9 @@ mod tests {
         let wrong_token = Address::generate(&env);
         let title = String::from_str(&env, "T");
         let description = String::from_str(&env, "D");
+        let metadata_uri = String::from_str(&env, "");
 
-        let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &token, &9_999_999_999, &title, &description);
+        let invoice_id = client.create_invoice(&freelancer, &payer, &1000, &token, &9_999_999_999, &title, &description, &metadata_uri);
         let result = client.try_fund_invoice(&invoice_id, &wrong_token);
         assert_eq!(result, Err(Ok(ContractError::TokenMismatch)));
     }

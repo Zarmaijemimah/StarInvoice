@@ -23,10 +23,11 @@ mod tests {
         let (freelancer, client, token_address) = setup(&env);
         let title = String::from_str(&env, "Max Amount Invoice");
         let description = String::from_str(&env, "Invoice at the maximum allowed amount");
+        let metadata_uri = String::from_str(&env, "");
         let max_amount: i128 = 10_000_000_000_000;
 
         let result = contract_client.try_create_invoice(
-            &freelancer, &client, &max_amount, &token_address, &9999999999, &title, &description,
+            &freelancer, &client, &max_amount, &token_address, &9999999999, &title, &description, &metadata_uri,
         );
         assert!(result.is_ok(), "Invoice creation should succeed at MAX_INVOICE_AMOUNT");
         let invoice_id = result.unwrap().unwrap();
@@ -50,10 +51,11 @@ mod tests {
         let (freelancer, client, token_address) = setup(&env);
         let title = String::from_str(&env, "Over Max Invoice");
         let description = String::from_str(&env, "Invoice exceeding maximum amount");
+        let metadata_uri = String::from_str(&env, "");
         let over_max_amount: i128 = 10_000_000_000_001;
 
         let result = contract_client.try_create_invoice(
-            &freelancer, &client, &over_max_amount, &token_address, &9999999999, &title, &description,
+            &freelancer, &client, &over_max_amount, &token_address, &9999999999, &title, &description, &metadata_uri,
         );
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().unwrap(), ContractError::AmountExceedsMaximum);
@@ -70,10 +72,11 @@ mod tests {
         let (freelancer, client, token_address) = setup(&env);
         let title = String::from_str(&env, "Way Over Max Invoice");
         let description = String::from_str(&env, "Invoice far exceeding maximum amount");
+        let metadata_uri = String::from_str(&env, "");
         let way_over_max: i128 = 100_000_000_000_000;
 
         let result = contract_client.try_create_invoice(
-            &freelancer, &client, &way_over_max, &token_address, &9999999999, &title, &description,
+            &freelancer, &client, &way_over_max, &token_address, &9999999999, &title, &description, &metadata_uri,
         );
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().unwrap(), ContractError::AmountExceedsMaximum);
@@ -90,10 +93,11 @@ mod tests {
         let (freelancer, client, token_address) = setup(&env);
         let title = String::from_str(&env, "Normal Invoice");
         let description = String::from_str(&env, "Invoice with normal amount");
+        let metadata_uri = String::from_str(&env, "");
         let normal_amount: i128 = 1000;
 
         let result = contract_client.try_create_invoice(
-            &freelancer, &client, &normal_amount, &token_address, &9999999999, &title, &description,
+            &freelancer, &client, &normal_amount, &token_address, &9999999999, &title, &description, &metadata_uri,
         );
         assert!(result.is_ok());
         let invoice_id = result.unwrap().unwrap();
@@ -114,10 +118,11 @@ mod tests {
         let (freelancer, client, token_address) = setup(&env);
         let title = String::from_str(&env, "Large Invoice");
         let description = String::from_str(&env, "Invoice with large but valid amount");
+        let metadata_uri = String::from_str(&env, "");
         let large_amount: i128 = 5_000_000_000_000;
 
         let result = contract_client.try_create_invoice(
-            &freelancer, &client, &large_amount, &token_address, &9999999999, &title, &description,
+            &freelancer, &client, &large_amount, &token_address, &9999999999, &title, &description, &metadata_uri,
         );
         assert!(result.is_ok());
         let invoice_id = result.unwrap().unwrap();
@@ -141,6 +146,7 @@ mod tests {
             &freelancer, &client, &1000, &token_address, &9999999999,
             &String::from_str(&env, "First Invoice"),
             &String::from_str(&env, "First"),
+            &String::from_str(&env, ""),
         );
         assert_eq!(id1, 0);
 
@@ -148,6 +154,7 @@ mod tests {
             &freelancer, &client, &100_000_000_000_000, &token_address, &9999999999,
             &String::from_str(&env, "Over Limit Invoice"),
             &String::from_str(&env, "This should fail"),
+            &String::from_str(&env, ""),
         );
         assert!(result2.is_err());
 
@@ -155,6 +162,7 @@ mod tests {
             &freelancer, &client, &2000, &token_address, &9999999999,
             &String::from_str(&env, "Third Invoice"),
             &String::from_str(&env, "Third"),
+            &String::from_str(&env, ""),
         );
         assert_eq!(id3, 1, "Third invoice should have ID 1, proving failed attempt did not increment state");
     }
@@ -170,9 +178,10 @@ mod tests {
         let (freelancer, client, token_address) = setup(&env);
         let title = String::from_str(&env, "Minimum Invoice");
         let description = String::from_str(&env, "Minimum valid amount");
+        let metadata_uri = String::from_str(&env, "");
 
         let result = contract_client.try_create_invoice(
-            &freelancer, &client, &1, &token_address, &9999999999, &title, &description,
+            &freelancer, &client, &1, &token_address, &9999999999, &title, &description, &metadata_uri,
         );
         assert!(result.is_ok());
         let invoice_id = result.unwrap().unwrap();

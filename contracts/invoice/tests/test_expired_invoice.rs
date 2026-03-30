@@ -36,6 +36,7 @@ mod tests {
             &past_deadline,
             &String::from_str(&env, "Expired Invoice"),
             &String::from_str(&env, "This invoice has a past deadline"),
+            &String::from_str(&env, ""),
         );
 
         let result = c.try_fund_invoice(&invoice_id, &token);
@@ -62,6 +63,7 @@ mod tests {
             &future_deadline,
             &String::from_str(&env, "Valid Invoice"),
             &String::from_str(&env, "This invoice has a future deadline"),
+            &String::from_str(&env, ""),
         );
 
         let result = c.try_fund_invoice(&invoice_id, &token);

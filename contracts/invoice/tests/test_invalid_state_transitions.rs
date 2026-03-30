@@ -33,6 +33,7 @@ mod tests {
             &9999999999,
             &String::from_str(env, "Test"),
             &String::from_str(env, "Test"),
+            &String::from_str(env, ""),
         );
         client.fund_invoice(&id, token);
         id
@@ -74,6 +75,7 @@ mod tests {
             &9999999999,
             &String::from_str(&env, "Test"),
             &String::from_str(&env, "Test"),
+            &String::from_str(&env, ""),
         );
 
         let result = c.try_mark_delivered(&id);

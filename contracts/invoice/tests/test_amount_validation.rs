@@ -23,9 +23,10 @@ mod tests {
         let (freelancer, client, token_address) = setup(&env);
         let title = String::from_str(&env, "Test");
         let description = String::from_str(&env, "Test invoice");
+        let metadata_uri = String::from_str(&env, "");
 
         let result = contract_client.try_create_invoice(
-            &freelancer, &client, &0, &token_address, &9999999999, &title, &description,
+            &freelancer, &client, &0, &token_address, &9999999999, &title, &description, &metadata_uri,
         );
         assert_eq!(result, Err(Ok(ContractError::InvalidAmount)));
     }
@@ -41,9 +42,10 @@ mod tests {
         let (freelancer, client, token_address) = setup(&env);
         let title = String::from_str(&env, "Test");
         let description = String::from_str(&env, "Test invoice");
+        let metadata_uri = String::from_str(&env, "");
 
         let result = contract_client.try_create_invoice(
-            &freelancer, &client, &-100, &token_address, &9999999999, &title, &description,
+            &freelancer, &client, &-100, &token_address, &9999999999, &title, &description, &metadata_uri,
         );
         assert_eq!(result, Err(Ok(ContractError::InvalidAmount)));
     }
@@ -69,9 +71,10 @@ mod tests {
 
         let title = String::from_str(&env, "Test");
         let description = String::from_str(&env, "Test invoice");
+        let metadata_uri = String::from_str(&env, "");
 
         let id = contract_client.create_invoice(
-            &freelancer, &client, &amount, &token_address, &9999999999, &title, &description,
+            &freelancer, &client, &amount, &token_address, &9999999999, &title, &description, &metadata_uri,
         );
         assert_eq!(id, 0);
     }

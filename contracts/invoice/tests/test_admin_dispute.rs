@@ -35,6 +35,7 @@ mod tests {
             &1000,
             &String::from_str(&env, "Test"),
             &String::from_str(&env, "Desc"),
+            &String::from_str(&env, ""),
         );
         contract_client.fund_invoice(&invoice_id, &token_address);
         contract_client.dispute_invoice(&invoice_id);
@@ -64,6 +65,7 @@ mod tests {
             &1000,
             &String::from_str(&env, "Test"),
             &String::from_str(&env, "Desc"),
+            &String::from_str(&env, ""),
         );
         contract_client.fund_invoice(&invoice_id, &token_address);
         contract_client.dispute_invoice(&invoice_id);

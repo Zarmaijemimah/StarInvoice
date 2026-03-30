@@ -27,6 +27,8 @@ pub enum ContractError {
     InvalidParties = 10,
     /// The invoice deadline has passed and it can no longer be funded.
     InvoiceExpired = 11,
+    /// The metadata URI exceeds the maximum allowed length.
+    MetadataUriTooLong = 12,
 }
 
 /// Represents the lifecycle state of an invoice.
@@ -73,6 +75,9 @@ pub struct Invoice {
     pub created_at: u64,
     /// Current state of the invoice in the escrow lifecycle.
     pub status: InvoiceStatus,
+    /// Optional URI pointing to off-chain invoice details (PDF, IPFS hash, etc.).
+    /// Can be empty. Maximum length is 512 bytes.
+    pub metadata_uri: String,
 }
 
 /// Represents a dispute on an invoice.

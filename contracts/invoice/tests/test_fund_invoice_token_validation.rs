@@ -32,6 +32,7 @@ mod tests {
             &9999999999,
             &String::from_str(&env, "Test Invoice"),
             &String::from_str(&env, "Test Invoice"),
+            &String::from_str(&env, ""),
         );
 
         let result = c.try_fund_invoice(&invoice_id, &token);
@@ -66,6 +67,7 @@ mod tests {
             &9999999999,
             &String::from_str(&env, "Test Invoice"),
             &String::from_str(&env, "Test Invoice"),
+            &String::from_str(&env, ""),
         );
 
         let result = c.try_fund_invoice(&invoice_id, &wrong_token);
@@ -105,6 +107,7 @@ mod tests {
             &9999999999,
             &String::from_str(&env, "Test Invoice"),
             &String::from_str(&env, "Test Invoice"),
+            &String::from_str(&env, ""),
         );
 
         let result = c.try_fund_invoice(&invoice_id, &wrong_token);

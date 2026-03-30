@@ -27,7 +27,8 @@ mod tests {
     ) -> u64 {
         let title = String::from_str(env, "Test");
         let description = String::from_str(env, "Test invoice");
-        let id = client.create_invoice(freelancer, payer, &amount, token, &9999999999, &title, &description);
+        let metadata_uri = String::from_str(env, "");
+        let id = client.create_invoice(freelancer, payer, &amount, token, &9999999999, &title, &description, &metadata_uri);
         client.fund_invoice(&id, token);
         id
     }
@@ -78,7 +79,8 @@ mod tests {
         let (freelancer, client, token_address, amount) = setup(&env);
         let title = String::from_str(&env, "Test");
         let description = String::from_str(&env, "Test invoice");
-        let invoice_id = contract_client.create_invoice(&freelancer, &client, &amount, &token_address, &9999999999, &title, &description);
+        let metadata_uri = String::from_str(&env, "");
+        let invoice_id = contract_client.create_invoice(&freelancer, &client, &amount, &token_address, &9999999999, &title, &description, &metadata_uri);
 
         let result = contract_client.try_dispute_invoice(&invoice_id);
         assert!(result.is_err());

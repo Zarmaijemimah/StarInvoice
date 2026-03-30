@@ -28,7 +28,8 @@ mod tests {
     ) -> u64 {
         let title = String::from_str(env, "Test");
         let description = String::from_str(env, "Test invoice");
-        contract_client.create_invoice(freelancer, client, &amount, token_address, &9999999999, &title, &description)
+        let metadata_uri = String::from_str(env, "");
+        contract_client.create_invoice(freelancer, client, &amount, token_address, &9999999999, &title, &description, &metadata_uri)
     }
 
     #[test]
