@@ -210,6 +210,13 @@ impl InvoiceContract {
     pub fn invoice_count(env: Env) -> u64 {
         views::invoice_count(&env)
     }
+
+    /// Returns all invoices whose amount falls within `[min, max]` (inclusive).
+    ///
+    /// See `views::get_invoices_by_amount_range` for the full-scan trade-off note.
+    pub fn get_invoices_by_amount_range(env: Env, min: i128, max: i128) -> soroban_sdk::Vec<Invoice> {
+        views::get_invoices_by_amount_range(&env, min, max)
+    }
 }
 
 #[cfg(test)]
